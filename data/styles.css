@@ -122,31 +122,31 @@ h2 {
     padding: 0;
 }
 
-/* Slider toggle switch (checkbox underneath, so it posts with the form). */
+/* Toggle switch (a checkbox underneath, so it posts with the form). */
 .switch-row {
     display: flex;
     align-items: center;
-    gap: 10px;
+    justify-content: space-between;
     cursor: pointer;
 }
 
 .switch {
     position: relative;
     display: inline-block;
-    width: 3rem;
-    height: 1.6rem;
+    width: 2.6rem;
+    height: 1.4rem;
     flex: none;
 }
 
 .switch input {
     opacity: 0;
+    position: absolute;
+    left: 0;
+    top: 0;
     width: 100%;
     height: 100%;
     margin: 0;
     padding: 0;
-    position: absolute;
-    left: 0;
-    top: 0;
     cursor: pointer;
     z-index: 1;
 }
@@ -158,35 +158,34 @@ h2 {
     right: 0;
     bottom: 0;
     background: #8a8a8a;
-    border-radius: 1.6rem;
-    transition: background 0.3s;
+    border-radius: 1.4rem;
+    transition: background 0.2s;
 }
 
 .slider::before {
     content: "";
     position: absolute;
-    width: 1.2rem;
-    height: 1.2rem;
+    width: 1rem;
+    height: 1rem;
     left: 0.2rem;
     top: 0.2rem;
     background: #faffff;
     border-radius: 50%;
-    transition: transform 0.3s;
+    transition: transform 0.2s;
 }
 
 .switch input:checked+.slider {
-    background: #47c266;
+    background: #1fa3ec;
 }
 
 .switch input:checked+.slider::before {
-    transform: translateX(1.4rem);
+    transform: translateX(1.2rem);
 }
 
-.switch input:focus-visible+.slider {
-    outline: 2px solid #1fa3ec;
-}
-
+/* Width 0 + min-width 100% keeps the long note from widening the whole page. */
 .note {
-    font-size: 0.85em;
+    width: 0;
+    min-width: 100%;
+    font-size: 0.9em;
     color: #d0d0d0;
 }
