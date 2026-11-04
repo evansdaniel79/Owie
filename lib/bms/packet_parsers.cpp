@@ -21,6 +21,11 @@ void BmsRelay::batteryPercentageParser(Packet& p) {
   // 0x3 message is just one byte containing battery percentage.
   bms_soc_percent_ = *(int8_t*)p.data();
   overridden_soc_percent_ = battery_fuel_gauge_.getSoc();
+  if (pass_through_soc_) {
+    // Stock battery mode: leave the BMS value alone and forward it as is.
+    // overridden_soc_percent_ is still computed for the monitor page.
+    return;
+  }
   if (overridden_soc_percent_ < 0) {
     p.setShouldForward(false);
     return;
@@ -32,7 +37,7 @@ void BmsRelay::currentParser(Packet& p) {
   if (p.getType() != 5) {
     return;
   }
-  p.setShouldForward(isCharging());
+  p.setShouldForward(pass_through_current_ || isCharging());
 
   // 0x5 message encodes current as signed int16.
   // The scaling factor (tested on a Pint) seems to be 0.055
@@ -106,7 +111,8 @@ void BmsRelay::bmsStatusParser(Packet& p) {
   // Forwarding the status packet during normal operation seems to drive
   // an event loop in the controller that tallies used Ah and eventually
   // makes the board throw Error 23. Swallowing the packet does the trick.
-  p.setShouldForward(isCharging() || isBatteryEmpty() ||
+  // Stock battery mode (pass_through_status_) forwards it regardless.
+  p.setShouldForward(pass_through_status_ || isCharging() || isBatteryEmpty() ||
                      isBatteryTempOutOfRange() || isBatteryOvercharged());
   battery_fuel_gauge_.updateChargingStatus(isCharging());
 }

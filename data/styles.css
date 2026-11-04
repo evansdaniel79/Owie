@@ -121,3 +121,72 @@ h2 {
     margin: 0;
     padding: 0;
 }
+
+/* Slider toggle switch (checkbox underneath, so it posts with the form). */
+.switch-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+}
+
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 3rem;
+    height: 1.6rem;
+    flex: none;
+}
+
+.switch input {
+    opacity: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    position: absolute;
+    left: 0;
+    top: 0;
+    cursor: pointer;
+    z-index: 1;
+}
+
+.slider {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: #8a8a8a;
+    border-radius: 1.6rem;
+    transition: background 0.3s;
+}
+
+.slider::before {
+    content: "";
+    position: absolute;
+    width: 1.2rem;
+    height: 1.2rem;
+    left: 0.2rem;
+    top: 0.2rem;
+    background: #faffff;
+    border-radius: 50%;
+    transition: transform 0.3s;
+}
+
+.switch input:checked+.slider {
+    background: #47c266;
+}
+
+.switch input:checked+.slider::before {
+    transform: translateX(1.4rem);
+}
+
+.switch input:focus-visible+.slider {
+    outline: 2px solid #1fa3ec;
+}
+
+.note {
+    font-size: 0.85em;
+    color: #d0d0d0;
+}

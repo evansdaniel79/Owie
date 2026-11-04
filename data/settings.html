@@ -35,6 +35,20 @@
         </button>
       </fieldset>
       <fieldset>
+        <legend>Stock battery mode:</legend>
+        <label class="switch-row">
+          <span class="switch">
+            <input type="checkbox" name="stockmode" value="1" %STOCK_MODE_CHECKED%>
+            <span class="slider"></span>
+          </span>
+          <span>Stock battery mode</span>
+        </label>
+        <p class="note">Only use this if you want the stock functionality back (regen, range estimator and the
+          board's own battery percentage) and have a NON-upgraded battery. Leave it off if you have an
+          extended or upgraded battery pack, because those values will be wrong. Applied when you press Save
+          (the board restarts).</p>
+      </fieldset>
+      <fieldset>
         <legend>Firmware Update:</legend>
         <input id="updInput" type="file" name="firmware" accept=".bin,.bin.gz">
       </fieldset>

@@ -115,6 +115,20 @@ class BmsRelay {
 
   BatteryFuelGauge& getBatteryFuelGauge() { return battery_fuel_gauge_; }
 
+  /**
+   * @brief "Stock battery mode" switches. All default to false (original Owie
+   * behavior). Only enable these on a board with a non-upgraded stock battery.
+   *
+   * Owie still parses every packet and keeps its own stats either way; these
+   * only control what is sent on to the board.
+   */
+  /** Forward the BMS battery percentage untouched instead of Owie's estimate. */
+  void setPassThroughSoc(bool enabled) { pass_through_soc_ = enabled; }
+  /** Always forward the current packet (restores regen percent and range). */
+  void setPassThroughCurrent(bool enabled) { pass_through_current_ = enabled; }
+  /** Always forward the status packet, not only on warnings or charging. */
+  void setPassThroughStatus(bool enabled) { pass_through_status_ = enabled; }
+
  private:
   // BMS current units to milliamps.
   static constexpr int CURRENT_SCALER = 55;
@@ -140,6 +154,9 @@ class BmsRelay {
   int8_t temperatures_celsius_[5] = {0};
   int8_t avg_temperature_celsius_ = 0;
   uint8_t last_status_byte_ = 0;
+  bool pass_through_soc_ = false;
+  bool pass_through_current_ = false;
+  bool pass_through_status_ = false;
   const Source source_;
   const Sink sink_;
   const MillisProvider millis_provider_;

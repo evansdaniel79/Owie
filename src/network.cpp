@@ -208,6 +208,12 @@ String templateProcessor(const String &var) {
                ESP.getChipId() & 0xFFFF);
     }
     return String(apDisplayName);
+  } else if (var == "STOCK_MODE_CHECKED") {
+    // The three flags are always set together from the one switch.
+    return (Settings->pass_through_soc && Settings->pass_through_current &&
+            Settings->pass_through_status)
+               ? "checked"
+               : "";
   } else if (var == "WIFI_POWER") {
     return String(Settings->wifi_power);
   } else if (var == "WIFI_POWER_OPTIONS") {
@@ -373,6 +379,12 @@ void setupWebServer(BmsRelay *bmsRelay) {
           return;
         }
         Settings->wifi_power = wifiPower->value().toInt();
+        // Unchecked checkboxes aren't sent in the form post, so a missing
+        // param means "off".
+        const bool stockMode = request->getParam("stockmode", true) != nullptr;
+        Settings->pass_through_soc = stockMode;
+        Settings->pass_through_current = stockMode;
+        Settings->pass_through_status = stockMode;
         snprintf(Settings->ap_self_password, sizeof(Settings->ap_self_password),
                  "%s", apSelfPassword->value().c_str());
         snprintf(Settings->ap_self_name, sizeof(Settings->ap_self_name), "%s",

@@ -168,6 +168,78 @@ void testBlocksStatusPacketsUnlessWarning() {
   expectDataOut({0xff, 0x55, 0xaa, 0x0, 0x21, 0x2, 0x1F, 0x1});
 }
 
+// Packets used by the "stock battery mode" pass-through tests.
+const std::vector<uint8_t> kSocPacket = {0xff, 0x55, 0xaa, 0x3, 0x2b, 0x2, 0x2c};
+const std::vector<uint8_t> kCurrentPacket = {0xff, 0x55, 0xaa, 0x5,
+                                             0xff, 0xe8, 0x3,  0xea};
+const std::vector<uint8_t> kStatusPacket = {0xff, 0x55, 0xaa, 0x0,
+                                            0x0,  0x1,  0xfe};
+
+void testDefaultsOverrideSocAndBlockCurrentAndStatus() {
+  timeMillis = 0;
+  // Default (original Owie) behavior: SOC is rewritten, current and status
+  // packets are swallowed while not charging.
+  addMockData(kSocPacket);
+  relay->loop();
+  // Fuel gauge has no data yet, so the SOC gets rewritten to 0 (+ new CRC).
+  expectDataOut({0xff, 0x55, 0xaa, 0x3, 0x0, 0x2, 0x1});
+  TEST_ASSERT_EQUAL(43, relay->getBmsReportedSOC());
+
+  addMockData(kCurrentPacket);
+  relay->loop();
+  expectDataOut({});
+
+  addMockData(kStatusPacket);
+  relay->loop();
+  expectDataOut({});
+}
+
+void testPassThroughSocForwardsBmsValueUntouched() {
+  timeMillis = 0;
+  relay->setPassThroughSoc(true);
+  addMockData(kSocPacket);
+  relay->loop();
+  expectDataOut(kSocPacket);
+  TEST_ASSERT_EQUAL(43, relay->getBmsReportedSOC());
+}
+
+void testPassThroughCurrentForwardsCurrentPacket() {
+  timeMillis = 0;
+  relay->setPassThroughCurrent(true);
+  addMockData(kCurrentPacket);
+  relay->loop();
+  expectDataOut(kCurrentPacket);
+  // Owie's own stats keep working.
+  TEST_ASSERT_EQUAL(-1320, relay->getCurrentMilliamps());
+}
+
+void testPassThroughStatusForwardsStatusPacket() {
+  timeMillis = 0;
+  relay->setPassThroughStatus(true);
+  addMockData(kStatusPacket);
+  relay->loop();
+  expectDataOut(kStatusPacket);
+}
+
+void testPassThroughFlagsAreIndependent() {
+  timeMillis = 0;
+  // Only SOC pass-through on: current and status must still be blocked.
+  relay->setPassThroughSoc(true);
+  addMockData(kCurrentPacket);
+  relay->loop();
+  expectDataOut({});
+  addMockData(kStatusPacket);
+  relay->loop();
+  expectDataOut({});
+
+  // Only current pass-through on: SOC must still be rewritten.
+  setUp();
+  relay->setPassThroughCurrent(true);
+  addMockData(kSocPacket);
+  relay->loop();
+  expectDataOut({0xff, 0x55, 0xaa, 0x3, 0x0, 0x2, 0x1});
+}
+
 void testPacketReplay() {
   addMockData({0xff, 0x55, 0xaa, 0x0, 0x21, 0x2, 0x1F, 0x1});
   addMockData({0xff, 0x55, 0xaa, 0x08, 0x06, 0x02, 0x0c});
@@ -209,6 +281,11 @@ int main(int argc, char** argv) {
   RUN_TEST(testCurrentParsing);
   RUN_TEST(testCellVoltageParsing);
   RUN_TEST(testBlocksStatusPacketsUnlessWarning);
+  RUN_TEST(testDefaultsOverrideSocAndBlockCurrentAndStatus);
+  RUN_TEST(testPassThroughSocForwardsBmsValueUntouched);
+  RUN_TEST(testPassThroughCurrentForwardsCurrentPacket);
+  RUN_TEST(testPassThroughStatusForwardsStatusPacket);
+  RUN_TEST(testPassThroughFlagsAreIndependent);
   RUN_TEST(testPacketReplay);
   UNITY_END();
 

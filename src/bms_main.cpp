@@ -93,6 +93,11 @@ void bms_setup() {
 
   relay->setBMSSerialOverride(0xFFABCDEF);
 
+  // "Stock battery mode" switches from the Settings page (default off).
+  relay->setPassThroughSoc(Settings->pass_through_soc);
+  relay->setPassThroughCurrent(Settings->pass_through_current);
+  relay->setPassThroughStatus(Settings->pass_through_status);
+
   setupWifi();
   setupWebServer(relay);
   TaskQueue.postRecurringTask([]() { relay->loop(); });

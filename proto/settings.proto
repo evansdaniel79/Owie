@@ -18,6 +18,12 @@ message SettingsMsg {
   bool is_locked = 9; // if the board is actively locked/parked
   bool locking_enabled = 10; // if the board locking functionality is enabled ('armed')
   BatteryStateMsg battery_state = 12;
+  // "Stock battery mode" switches. All default to false, which keeps the
+  // original Owie behavior. When true, the matching BMS packet is forwarded to
+  // the board untouched.
+  bool pass_through_soc = 13;      // battery percentage (packet 3)
+  bool pass_through_current = 14;  // current: regen percent + range (packet 5)
+  bool pass_through_status = 15;   // status flags (packet 0)
 
   reserved 5,11;
 }
