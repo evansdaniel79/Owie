@@ -77,11 +77,6 @@ void BatteryFuelGauge::updateVoltage(int32_t voltageMillivolts,
 
 void BatteryFuelGauge::updateCurrent(int32_t currentMilliamps,
                                      int32_t nowMillis) {
-  // Ignore current updates until we see first voltage message
-  if (voltage_millivolts_ < 0) {
-    return;
-  }
-
   defer { last_current_update_time_millis_ = nowMillis; };
   if (last_current_update_time_millis_ < 0) {
     return;
@@ -126,6 +121,11 @@ void BatteryFuelGauge::onHighestCharge() {
 }
 
 void BatteryFuelGauge::onHighestDischarge() {
+  // Skip until we have a voltage-derived SOC; otherwise the unsigned
+  // comparisons below would assign the sentinel -1 to bottomSoc.
+  if (voltage_based_soc_ < 0) {
+    return;
+  }
   // Maintain an invariant of topSoc >= bottomSoc
   if (voltage_based_soc_ > state_.topSoc) {
     return;

@@ -1,19 +1,36 @@
 name: Build and test everything
 on: [push, pull_request, workflow_call, workflow_dispatch]
+# The build job runs third-party code (pip, npm, PlatformIO), so it only gets a
+# read-only token. Publishing the PR report needs write access and is done in a
+# separate job that runs no repository or third-party code.
+permissions:
+  contents: read
+# One run at a time per pull request (or per branch/tag for pushes): a newer
+# push cancels the older PR run, so two runs never race for the ci-pr-<n>
+# pre-release or post reports out of order.
+concurrency:
+  group: build-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   build_and_test:
     runs-on: ubuntu-latest
+    outputs:
+      tests: ${{ steps.tests.outcome }}
+      build: ${{ steps.build.outcome }}
+      firmware_artifact_url: ${{ steps.artifact.outputs.artifact-url }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Cache pip
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
       - name: Cache PlatformIO
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.platformio
           key: ${{ runner.os }}-${{ hashFiles('**/lockfiles') }}
@@ -27,11 +44,131 @@ jobs:
       - name: Install library dependencies
         run: pio lib -g install 1
       - name: Run tests Owie
-        run: pio test -e native
+        id: tests
+        run: |
+          set -o pipefail
+          pio --no-ansi test -e native 2>&1 | tee test-output.txt
       - name: Build Owie
-        run: pio run -e d1_mini_lite_clone
+        id: build
+        # Build even when a test failed so the PR report can still link the firmware.
+        if: always()
+        run: |
+          set -o pipefail
+          pio --no-ansi run -e d1_mini_lite_clone 2>&1 | tee build-output.txt
       - name: Upload artifacts
+        id: artifact
+        if: always() && steps.build.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: firmware
           path: .pio/build/d1_mini_lite_clone/firmware.bin
+      - name: Upload test and build logs for the PR report
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-logs
+          path: |
+            test-output.txt
+            build-output.txt
+          if-no-files-found: ignore
+          retention-days: 7
+
+  pr_report:
+    # Pull requests only (pushes and the tagged-release workflow_call have no PR).
+    # Forks get a read-only token, so this job must never fail the build.
+    if: always() && github.event_name == 'pull_request'
+    needs: build_and_test
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Download test and build logs
+        uses: actions/download-artifact@v4
+        with:
+          name: ci-logs
+          path: logs
+        continue-on-error: true
+      - name: Download firmware
+        if: needs.build_and_test.outputs.build == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: firmware
+          path: fw
+      - name: Publish firmware.bin as a direct download (per-PR pre-release)
+        # Artifacts are only served as zip files, so the .bin is published as
+        # firmware_<short sha>.bin, the single asset of a pre-release tagged
+        # ci-pr-<number>. The release is
+        # recreated on every push (tag follows the PR head) and deleted by
+        # pr_cleanup.yml when the PR closes.
+        id: firmware
+        if: needs.build_and_test.outputs.build == 'success'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          TAG="ci-pr-${PR_NUMBER}"
+          ASSET="firmware_${HEAD_SHA:0:7}.bin"
+          cp fw/firmware.bin "fw/${ASSET}"
+          NOTES="Automated build of PR #${PR_NUMBER} at ${HEAD_SHA} by the \"Build and test everything\" workflow. Pre-release only: replaced on every push to the PR and deleted when the PR closes. This is not a release of Owie; see Releases for those."
+          gh release delete "$TAG" --cleanup-tag -y 2>/dev/null || true
+          gh release create "$TAG" "fw/${ASSET}" \
+            --prerelease --target "$HEAD_SHA" --title "CI build for PR #${PR_NUMBER}" --notes "$NOTES"
+          echo "name=${ASSET}" >> "$GITHUB_OUTPUT"
+          echo "url=https://github.com/${GH_REPO}/releases/download/${TAG}/${ASSET}" >> "$GITHUB_OUTPUT"
+      - name: Comment test result and firmware links on the PR
+        uses: actions/github-script@v7
+        env:
+          TESTS_OUTCOME: ${{ needs.build_and_test.outputs.tests }}
+          BUILD_OUTCOME: ${{ needs.build_and_test.outputs.build }}
+          ARTIFACT_URL: ${{ needs.build_and_test.outputs.firmware_artifact_url }}
+          FIRMWARE_URL: ${{ steps.firmware.outputs.url }}
+          FIRMWARE_NAME: ${{ steps.firmware.outputs.name }}
+        with:
+          script: |
+            const fs = require('fs');
+            const read = (f) => { try { return fs.readFileSync(f, 'utf8'); } catch { return ''; } };
+            const tests = read('logs/test-output.txt');
+            const build = read('logs/build-output.txt');
+            const marker = '<!-- owie-ci-report -->';
+
+            // PlatformIO prints a SUMMARY table followed by "=== N test cases: ... ===".
+            const summaryMatch = tests.match(/=+ SUMMARY =+[\s\S]*?\n=+ \d+ test cases?:.*=+/);
+            const summary = summaryMatch
+              ? summaryMatch[0]
+              : tests.split('\n').filter(l => /test cases?:|\[FAILED\]|\[PASSED\]|Error/.test(l)).slice(-15).join('\n');
+            const failed = tests.split('\n').filter(l => /\[FAILED\]|:FAIL:/.test(l)).slice(0, 30).join('\n');
+            const size = build.split('\n').filter(l => /^(RAM|Flash):/.test(l)).join('\n');
+
+            const icon = o => o === 'success' ? ':white_check_mark:' : o === 'failure' ? ':x:' : ':warning:';
+            const pr = context.payload.pull_request;
+            const sha = pr.head.sha.slice(0, 7);
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const artifactUrl = process.env.ARTIFACT_URL;
+            const firmwareUrl = process.env.FIRMWARE_URL;
+            const firmwareName = process.env.FIRMWARE_NAME || `firmware_${sha}.bin`;
+            const firmwareCell = [
+              firmwareUrl ? `[${firmwareName}](${firmwareUrl}) (direct download)` : '',
+              artifactUrl ? `[zip artifact](${artifactUrl})` : '',
+            ].filter(Boolean).join(' · ') || 'not available';
+
+            let body = `${marker}\n### CI report for ${sha}\n\n`;
+            body += `| check | result |\n|---|---|\n`;
+            body += `| native tests | ${icon(process.env.TESTS_OUTCOME)} ${process.env.TESTS_OUTCOME} |\n`;
+            body += `| ESP8266 firmware build | ${icon(process.env.BUILD_OUTCOME)} ${process.env.BUILD_OUTCOME} |\n`;
+            body += `| compiled firmware | ${firmwareCell} |\n`;
+            body += `| workflow run | [${context.runId}](${runUrl}) |\n`;
+            if (size) body += `\n\`\`\`\n${size}\n\`\`\`\n`;
+            if (failed) body += `\n<details open><summary>Failed tests</summary>\n\n\`\`\`\n${failed}\n\`\`\`\n</details>\n`;
+            if (summary) body += `\n<details><summary>Test summary</summary>\n\n\`\`\`\n${summary.trim()}\n\`\`\`\n</details>\n`;
+            body += `\n<sub>Posted by the "Build and test everything" workflow for every push. The direct download is a pre-release that is replaced on every push and deleted when the PR closes; the zip artifact needs a GitHub login and expires with the run's retention.</sub>\n`;
+
+            // One new comment per run, so the history of every push stays visible.
+            const { owner, repo } = context.repo;
+            const { data } = await github.rest.issues.createComment({ owner, repo, issue_number: pr.number, body });
+            core.info(`created comment ${data.id}`);

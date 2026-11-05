@@ -17,10 +17,21 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: firmware
-          path: ./firmware.bin
+          path: ./fw
+      - name: Name the firmware after the release tag
+        # The build artifact is always firmware.bin; the release asset carries
+        # the tag, e.g. firmware_v1.5.0.bin.
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          mv ./fw/firmware.bin "./fw/firmware_${TAG}.bin"
+          ls -l ./fw
       - uses: "marvinpinto/action-automatic-releases@latest"
         with:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
-          prerelease: false
+          # Tags with a suffix (v1.6.0-rc1, v1.6.0-beta2) are pre-releases;
+          # plain vX.Y.Z tags are full releases.
+          prerelease: ${{ contains(github.ref_name, '-') }}
           files: |
-            ./firmware.bin
+            ./fw/firmware_*.bin

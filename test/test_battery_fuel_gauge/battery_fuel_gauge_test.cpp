@@ -15,8 +15,6 @@ void testUninitializedGauge() {
 }
 
 void testCurrentRideSpentAndRegeneratedStats() {
-  // Current updates are ignored until the first voltage message is seen.
-  gauge->updateVoltage(3800, 0);
   gauge->updateCurrent(6666, 0);  // The first current is disregarded
   gauge->updateCurrent(1000, 123);
   TEST_ASSERT_EQUAL(0, gauge->getMilliampSecondsRecharged());
@@ -70,11 +68,7 @@ void testSimpleChargeAndHalfwayDischarge() {
   }
   state = gauge->getState();
   TEST_ASSERT_EQUAL(43, gauge->getSoc());
-  // The recreated gauge ignores current until it has seen a voltage and then
-  // disregards the first current sample, so one 100ms interval at 6A (600 mAs)
-  // is not counted.
-  TEST_ASSERT_EQUAL(6 * 10 * 60 * 1000 - 600,
-                    gauge->getMilliampSecondsDischarged());
+  TEST_ASSERT_EQUAL(6 * 10 * 60 * 1000, gauge->getMilliampSecondsDischarged());
   TEST_ASSERT_EQUAL(0, gauge->getMilliampSecondsRecharged());
 }
 

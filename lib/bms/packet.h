@@ -3,9 +3,13 @@
 
 #include <cstdint>
 
+// Total frame length (3 byte preamble + type + payload + 2 byte checksum) per
+// message type, -1 = unknown. 0x01 is the shutdown countdown warning (seconds,
+// reason), 0x0E is the Pint command acknowledgement; both are only sent in
+// special situations and must never be replayed (see bms_relay.cpp).
 // A bunch of places use sizeof(), don't change type.
 static const int8_t PACKET_LENGTHS_BY_TYPE[] = {
-    7, -1, 38, 7, 11, 8, 10, 13, 7, 7, -1, 8, 8, 9, -1, 11, 16, 10};
+    7, 8, 38, 7, 11, 8, 10, 13, 7, 7, -1, 8, 8, 9, 7, 11, 16, 10};
 
 class Packet {
  public:
