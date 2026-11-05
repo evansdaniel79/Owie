@@ -11,7 +11,7 @@ VALS = {
     "TOTAL_VOLTAGE": "58.84", "CURRENT_AMPS": "1.2", "BMS_SOC": "71", "OVERRIDDEN_SOC": "68",
     "VOLTAGE_BASED_SOC": "69", "BOTTOM_SOC": "10", "TOP_SOC": "95", "BOTTOM_MILLIAMP_HOURS": "2500",
     "CURRENT_MILLIAMP_HOURS": "800", "USED_CHARGE_MAH": "1234", "REGENERATED_CHARGE_MAH": "210",
-    "UPTIME": "0d 0h 12m 3s", "GRACEFUL_SHUTDOWN_COUNT": "4", "OWIE_version": "preview",
+    "UPTIME": "0d 0h 12m 3s", "GRACEFUL_SHUTDOWN_COUNT": "4", "OWIE_version": "1.7.0",
     "DISPLAY_AP_NAME": "Owie-1234", "AP_SELF_NAME": "", "AP_PASSWORD": "", "WIFI_POWER": "20",
     "WIFI_POWER_OPTIONS": "<option>10</option><option selected>20</option>",
     "CAN_ENABLE_LOCKING": "1", "LOCKING_ENABLED": "", "IS_LOCKED": "", 

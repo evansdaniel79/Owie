@@ -1,8 +1,36 @@
-# Owie
+# Owie - Evans fork
 
-[![Gitpod Ready-to-Code](https://img.shields.io/badge/Gitpod-Ready--to--Code-blue?logo=gitpod)](https://gitpod.io/#https://github.com/lolwheel/Owie)
+[![Gitpod Ready-to-Code](https://img.shields.io/badge/Gitpod-Ready--to--Code-blue?logo=gitpod)](https://gitpod.io/#https://github.com/evansdaniel79/Owie)
+[![Build and test](https://github.com/evansdaniel79/Owie/actions/workflows/build_and_test_all.yml/badge.svg)](https://github.com/evansdaniel79/Owie/actions/workflows/build_and_test_all.yml)
 
-This project unlocks battery expansion possibilities on otherwise locked OneWheels, adds WiFi-based monitoring of various battery health signals such as individual cell voltages, current, etc.
+Owie sits between a OneWheel's BMS and controller (Pint, Pint X and XR). It unlocks battery expansion, and it shows live battery stats over WiFi: cell voltages, current, temperatures and more.
+
+**This fork keeps Owie's features and adds:**
+
+- **Stock battery mode** - one switch in Settings that gives you the stock regen readout, range estimator and battery percentage back. For people with a **NON-upgraded (stock) battery**, who don't want Owie rewriting those. Off by default.
+- **A new look** - a dark card-style web UI that works well on a phone (based on [NexusOwie](https://github.com/Bazing89/NexusOwie)).
+- **Advanced BMS info page** - BMS firmware, hardware variant, thresholds, balancing, cycle count, state of health, last shutdown reason, serial numbers, plus a live shutdown warning on the status page (from [radimklaska's fork](https://github.com/radimklaska/owie)).
+- **Better battery tracking and state saving** - fuel gauge fixes and saving state on shutdown (also from radimklaska's fork).
+- **Safer web pages** - fixed a bug where a `%` in a value (or a WiFi name) could break a page with "UNKNOWN PLACEHOLDER".
+- **Tools for developers** - `tools/preview_ui.py` previews the web UI on your computer with fake data, `tools/check_ui.py` catches page-template mistakes, and CI builds and tests every push.
+
+<p>
+<img src="docs/img/ui_status.png" height="420px">
+<img src="docs/img/ui_settings.png" height="420px">
+<img src="docs/img/ui_bms_info.png" height="420px">
+</p>
+
+_Screenshots are from the laptop preview with sample data._
+
+## Download
+
+Get `firmware_v*.bin` from the [Releases page](https://github.com/evansdaniel79/Owie/releases/latest). Already running Owie? Update over WiFi - see [Updating Owie](#updating-owie). First time? See [Flashing Owie for the first time](#flashing-owie-for-the-first-time).
+
+**Status:** tested on a OneWheel XR with a stock battery. Other boards are untested - please open an issue with what you find. This is a hobby project, so see the disclaimer below.
+
+## Credits
+
+Built on [lolwheel/Owie](https://github.com/lolwheel/Owie) (MIT). UI from [Bazing89/NexusOwie](https://github.com/Bazing89/NexusOwie), BMS info and fuel gauge work from [radimklaska/owie](https://github.com/radimklaska/owie). Thanks to all of them.
 
 # Disclaimer
 
@@ -19,6 +47,7 @@ This is a hobby project for its contributors and comes with absolutely no guaran
 - Supports future firmware updates via WiFi - no need to reopen your board.
 - Adds password protection to your board
 - **Stock battery mode** (this fork): one switch on the Settings page that gives you the stock regen readout, range estimator and battery percentage back. For NON-upgraded batteries only.
+- **Advanced BMS info page** (this fork): firmware, thresholds, balancing, cycles, state of health, serial numbers.
 
 # Installing Owie into your board
 
@@ -132,12 +161,12 @@ Use these instructions to update your Owie installation over WiFi (OTA).
 
 These instructions will work so long as you can connect to your regular `Owie-XXXX` network.
 
-1. Download the latest `firmware.bin` from the Releases tab.
+1. Download the latest `firmware_v*.bin` from the [Releases page](https://github.com/evansdaniel79/Owie/releases/latest).
 1. Once you have your hands on a firmware.bin file, copy that binary onto your flashing device of choice (desktop, laptop, phone). Some phones might not let you select the binary, thus you will need to use a computer.
 1. Bring that device close to your board and ensure that your OneWheel has at least a few percent of battery left in the tank.
 1. Connect to your normal Owie network `Owie-XXXX` and navigate to your normal Owie IP (192.168.4.1).
 1. You should see the Owie menu load as normal.
-1. Click "Settings" button, hit the "Browse" button in the Firmware section of the page and select the `firmware.bin`.
+1. Click the "Settings" button, then "Firmware Update". Choose the firmware file (`firmware_v*.bin`) and start the upload.
 1. The page will look unresponsive during the file upload, do not refresh it.
 1. Once the file is uploaded you will see a success message. DO NOT CUT POWER TO OWIE until it's WiFi is back on. Doing otherwise will brick your Owie and you'll have to re-flash it via USB.
 1. Connect to the normal Owie network, and check that your update has worked.
