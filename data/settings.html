@@ -50,7 +50,7 @@
 
       <div class="section">
         <h2 class="section-title">Stock Battery Mode</h2>
-        <label class="switch-row"><span>Use stock battery behavior</span><span class="switch"><input type="checkbox" name="stockmode" value="1" %STOCK_MODE_CHECKED%><span class="slider"></span></span></label>
+        <label class="switch-row"><span>Use stock battery behavior</span><span class="switch"><input type="checkbox" name="stockmode" value="1" id="stockmode"><span class="slider"></span></span></label>
         <p class="field-hint">Only use this if you want the stock functionality back and have a NON-upgraded battery. Restores regen, the range estimator and the board's own battery percentage. Applied on Save.</p>
       </div>
 
@@ -67,6 +67,16 @@
       <button class="btn-secondary" onclick="history.back()">Back</button>
     </div>
 
+    <script>
+      (() => {
+        const sm = new XMLHttpRequest();
+        sm.open("GET", "/stockmode");
+        sm.onload = () => {
+          if (sm.status === 200) document.getElementById("stockmode").checked = sm.responseText === "1";
+        };
+        sm.send();
+      })();
+    </script>
     <script>
       (() => {
         const cannotLockMsg = "First set WiFi password above and save settings to enable board locking.";

@@ -89,22 +89,6 @@
                         <td id="REGENERATED_CHARGE_MAH">%REGENERATED_CHARGE_MAH% mAh</td>
                     </tr>
                     <tr>
-                        <th>Received serial (dec)</th>
-                        <td id="RECEIVED_SERIAL_DEC">%RECEIVED_SERIAL_DEC%</td>
-                    </tr>
-                    <tr>
-                        <th>Received serial (hex)</th>
-                        <td id="RECEIVED_SERIAL_HEX">%RECEIVED_SERIAL_HEX%</td>
-                    </tr>
-                    <tr>
-                        <th>Sent serial (dec)</th>
-                        <td id="SENT_SERIAL_DEC">%SENT_SERIAL_DEC%</td>
-                    </tr>
-                    <tr>
-                        <th>Sent serial (hex)</th>
-                        <td id="SENT_SERIAL_HEX">%SENT_SERIAL_HEX%</td>
-                    </tr>
-                    <tr>
                         <th>Uptime</th>
                         <td id="UPTIME">%UPTIME%</td>
                     </tr>
@@ -131,13 +115,10 @@
 
             <div class="btn-row">
                 <form action="/battery">
-                    <button>Battery</button>
+                    <button>Advanced BMS Info</button>
                 </form>
                 <form action="/settings">
                     <button class="btn-secondary">Settings</button>
-                </form>
-                <form action="/update">
-                    <button class="btn-secondary">Firmware Update</button>
                 </form>
                 <button style="display:none" id="unlockButton" data-locked="%IS_LOCKED%">
                     Unlock Board

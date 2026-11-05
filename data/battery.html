@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-    <title>Owie - Battery</title>
+    <title>Owie - Advanced BMS Info</title>
     <link rel="stylesheet" href="styles.css?v=5">
 </head>
 
@@ -17,7 +17,7 @@
             </div>
         </header>
 
-        <h1>Battery</h1>
+        <h1>Advanced BMS Info</h1>
 
         <div class="section">
             <table>
@@ -78,6 +78,28 @@
                 <tr>
                     <th>State of health</th>
                     <td>%BMS_HEALTH%</td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">Serial Numbers</h2>
+            <table>
+                <tr>
+                    <th>Received serial (dec)</th>
+                    <td>%RECEIVED_SERIAL_DEC%</td>
+                </tr>
+                <tr>
+                    <th>Received serial (hex)</th>
+                    <td>%RECEIVED_SERIAL_HEX%</td>
+                </tr>
+                <tr>
+                    <th>Sent serial (dec)</th>
+                    <td>%SENT_SERIAL_DEC%</td>
+                </tr>
+                <tr>
+                    <th>Sent serial (hex)</th>
+                    <td>%SENT_SERIAL_HEX%</td>
                 </tr>
             </table>
         </div>

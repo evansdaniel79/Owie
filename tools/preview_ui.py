@@ -14,7 +14,7 @@ VALS = {
     "UPTIME": "0d 0h 12m 3s", "GRACEFUL_SHUTDOWN_COUNT": "4", "OWIE_version": "preview",
     "DISPLAY_AP_NAME": "Owie-1234", "AP_SELF_NAME": "", "AP_PASSWORD": "", "WIFI_POWER": "20",
     "WIFI_POWER_OPTIONS": "<option>10</option><option selected>20</option>",
-    "CAN_ENABLE_LOCKING": "1", "LOCKING_ENABLED": "", "IS_LOCKED": "", "STOCK_MODE_CHECKED": "",
+    "CAN_ENABLE_LOCKING": "1", "LOCKING_ENABLED": "", "IS_LOCKED": "", 
     "CELL_VOLTAGE_TABLE": CELLS,
     "TEMPERATURE_TABLE": "<tr><th>Pack 1</th><td>24C</td></tr><tr><th>BMS board</th><td>31C</td></tr>",
     "PACKET_STATS_TABLE": "<tr><th>Type 0</th><td>100</td></tr>",
@@ -43,6 +43,7 @@ class H(http.server.BaseHTTPRequestHandler):
         if p in PAGES: return self.send(render(PAGES[p]))
         if p == "/styles.css": return self.send(open(os.path.join(DATA, "styles.css")).read(), "text/css")
         if p == "/autoupdate": return self.send(json.dumps({k: VALS[k] for k in VALS if k.isupper() or k == "OWIE_version"}), "application/json")
+        if p == "/stockmode": return self.send("0", "text/plain")
         if p == "/lock": return self.send("1" if "toggleArm" in self.path else "ok", "text/plain")
         self.send_response(404); self.end_headers()
     def do_POST(self):

@@ -321,12 +321,6 @@ String templateProcessor(const String &var) {
                ESP.getChipId() & 0xFFFF);
     }
     return String(apDisplayName);
-  } else if (var == "STOCK_MODE_CHECKED") {
-    // The three flags are always set together from the one switch.
-    return (Settings->pass_through_soc && Settings->pass_through_current &&
-            Settings->pass_through_status)
-               ? "checked"
-               : "";
   } else if (var == "WIFI_POWER") {
     return String(Settings->wifi_power);
   } else if (var == "WIFI_POWER_OPTIONS") {
@@ -451,6 +445,11 @@ void setupWebServer(BmsRelay *bmsRelay) {
   webServer.on("/monitor", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send_P(200, "text/html", MONITOR_HTML_PROGMEM_ARRAY,
                     MONITOR_HTML_SIZE, templateProcessor);
+  });
+  webServer.on("/stockmode", HTTP_GET, [](AsyncWebServerRequest *request) {
+    const bool on = Settings->pass_through_soc && Settings->pass_through_current &&
+                    Settings->pass_through_status;
+    request->send(200, "text/plain", on ? "1" : "0");
   });
   webServer.on("/settings", HTTP_ANY, [](AsyncWebServerRequest *request) {
     switch (request->method()) {
