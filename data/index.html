@@ -1,12 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
-<!-- The HTML markup is based on the main page of Tasmota -->
 
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
     <title>Owie - Status</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css?v=5">
     <script>
         window.addEventListener('DOMContentLoaded', () => {
             function reloadData() {
@@ -50,97 +49,104 @@
 </head>
 
 <body>
-    <div style="text-align:left;display:inline-block;color:#eaeaea;min-width:340px;">
-        <div id="statusHeader" style="text-align:center;color:#eaeaea;margin-bottom:10px;">
-            <h2>Owie Status</h2>
-            (%DISPLAY_AP_NAME%)
-        </div>
+    <main class="page">
+        <header class="topbar">
+            <div class="brand">
+                <span class="brand-mark">OW</span>
+                <span class="brand-name">Owie</span>
+            </div>
+            <span class="ap-name">%DISPLAY_AP_NAME%</span>
+        </header>
+
+        <h1>Status</h1>
+
         <div id="content">
-            <table>
-                <tr>
-                    <th>Battery Voltage</th>
-                    <td id="TOTAL_VOLTAGE">%TOTAL_VOLTAGE%v</td>
-                </tr>
-                <tr>
-                    <th>Current</th>
-                    <td id="CURRENT_AMPS">%CURRENT_AMPS% Amps</td>
-                </tr>
-                <tr>
-                    <th>BMS reported SOC:</th>
-                    <td id="BMS_SOC">%BMS_SOC%%%</td>
-                </tr>
-                <tr>
-                    <th>Overridden SOC:</th>
-                    <td id="OVERRIDDEN_SOC">%OVERRIDDEN_SOC%%%</td>
-                </tr>
-                <tr>
-                    <th>Used charge:</th>
-                    <td id="USED_CHARGE_MAH">%USED_CHARGE_MAH% mAh</td>
-                </tr>
-                <tr>
-                    <th>Regen:</th>
-                    <td id="REGENERATED_CHARGE_MAH">%REGENERATED_CHARGE_MAH% mAh</td>
-                </tr>
-                <tr>
-                    <th>Received Serial (Dec):</th>
-                    <td id="RECEIVED_SERIAL_DEC">%RECEIVED_SERIAL_DEC%</td>
-                </tr>
-                <tr>
-                    <th>Received Serial (Hex):</th>
-                    <td id="RECEIVED_SERIAL_HEX">%RECEIVED_SERIAL_HEX%</td>
-                </tr>
-                <tr>
-                    <th>Sent Serial (Dec):</th>
-                    <td id="SENT_SERIAL_DEC">%SENT_SERIAL_DEC%</td>
-                </tr>
-                <tr>
-                    <th>Sent Serial (Hex):</th>
-                    <td id="SENT_SERIAL_HEX">%SENT_SERIAL_HEX%</td>
-                </tr>
-                <tr>
-                    <th>Uptime:</th>
-                    <td id="UPTIME">%UPTIME%</td>
-                </tr>
-                <tr>
-                    <th>BMS shutdown warning:</th>
-                    <td id="BMS_WARNING">%BMS_WARNING%</td>
-                </tr>
-                <tr>
-                    <th>Power cycles:</th>
-                    <td>%GRACEFUL_SHUTDOWN_COUNT%</td>
-                </tr>
-                <tr>
-                    <th>Cell voltages</th>
-                    <td>
-                        <table class="cell-voltages" id="CELL_VOLTAGE_TABLE">%CELL_VOLTAGE_TABLE%</table>
-                    </td>
-                </tr>
-                <tr>
-                    <th>Temps (pack &times;4, BMS board)</th>
-                    <td>
-                        <table class="cell-voltages" id="TEMPERATURE_TABLE">%TEMPERATURE_TABLE%</table>
-                    </td>
-                </tr>
-            </table>
-            <hr>
-            <p></p>
-            <form action="/battery">
-                <button>Battery</button>
-            </form>
-            <p></p>
-            <form action="/settings">
-                <button>Settings</button>
-            </form>
-            <p></p>
-            <button style="display:none" id="unlockButton" data-locked="%IS_LOCKED%">
-                Unlock Board
-            </button>
+            <div class="section">
+                <h2 class="section-title">Battery</h2>
+                <table>
+                    <tr>
+                        <th>Voltage</th>
+                        <td id="TOTAL_VOLTAGE">%TOTAL_VOLTAGE%v</td>
+                    </tr>
+                    <tr>
+                        <th>Current</th>
+                        <td id="CURRENT_AMPS">%CURRENT_AMPS% Amps</td>
+                    </tr>
+                    <tr>
+                        <th>BMS reported SOC</th>
+                        <td id="BMS_SOC">%BMS_SOC%%%</td>
+                    </tr>
+                    <tr>
+                        <th>Overridden SOC</th>
+                        <td id="OVERRIDDEN_SOC">%OVERRIDDEN_SOC%%%</td>
+                    </tr>
+                    <tr>
+                        <th>Used charge</th>
+                        <td id="USED_CHARGE_MAH">%USED_CHARGE_MAH% mAh</td>
+                    </tr>
+                    <tr>
+                        <th>Regen</th>
+                        <td id="REGENERATED_CHARGE_MAH">%REGENERATED_CHARGE_MAH% mAh</td>
+                    </tr>
+                    <tr>
+                        <th>Received serial (dec)</th>
+                        <td id="RECEIVED_SERIAL_DEC">%RECEIVED_SERIAL_DEC%</td>
+                    </tr>
+                    <tr>
+                        <th>Received serial (hex)</th>
+                        <td id="RECEIVED_SERIAL_HEX">%RECEIVED_SERIAL_HEX%</td>
+                    </tr>
+                    <tr>
+                        <th>Sent serial (dec)</th>
+                        <td id="SENT_SERIAL_DEC">%SENT_SERIAL_DEC%</td>
+                    </tr>
+                    <tr>
+                        <th>Sent serial (hex)</th>
+                        <td id="SENT_SERIAL_HEX">%SENT_SERIAL_HEX%</td>
+                    </tr>
+                    <tr>
+                        <th>Uptime</th>
+                        <td id="UPTIME">%UPTIME%</td>
+                    </tr>
+                    <tr>
+                        <th>BMS shutdown warning</th>
+                        <td id="BMS_WARNING">%BMS_WARNING%</td>
+                    </tr>
+                    <tr>
+                        <th>Power cycles</th>
+                        <td>%GRACEFUL_SHUTDOWN_COUNT%</td>
+                    </tr>
+                </table>
+            </div>
+
+            <div class="section">
+                <h2 class="section-title">Cell Voltages</h2>
+                <table class="cell-voltages" id="CELL_VOLTAGE_TABLE">%CELL_VOLTAGE_TABLE%</table>
+            </div>
+
+            <div class="section">
+                <h2 class="section-title">Battery / BMS Temps</h2>
+                <table class="cell-voltages" id="TEMPERATURE_TABLE">%TEMPERATURE_TABLE%</table>
+            </div>
+
+            <div class="btn-row">
+                <form action="/battery">
+                    <button>Battery</button>
+                </form>
+                <form action="/settings">
+                    <button class="btn-secondary">Settings</button>
+                </form>
+                <form action="/update">
+                    <button class="btn-secondary">Firmware Update</button>
+                </form>
+                <button style="display:none" id="unlockButton" data-locked="%IS_LOCKED%">
+                    Unlock Board
+                </button>
+            </div>
         </div>
-        <div id="version" style="text-align:right;font-size:11px;">
-            <hr>
-            <p style="color:#aaa;">Owie <span id="OWIE_version">%OWIE_version%</span></p>
-        </div>
-    </div>
+
+        <div class="footer-note">Owie <span id="OWIE_version">%OWIE_version%</span></div>
+    </main>
 </body>
 
 </html>

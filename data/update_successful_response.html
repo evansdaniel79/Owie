@@ -1,22 +1,41 @@
 <!DOCTYPE html>
 <html lang="en">
-<!-- The HTML markup is based on the main page of Tasmota -->
 
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+  <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
   <meta http-equiv="refresh" content="10;URL='/'" />
-  <title>Owie update</title>
-  <link rel="stylesheet" href="styles.css">
+  <title>Owie Update - Success</title>
+  <link rel="stylesheet" href="styles.css?v=6">
 </head>
 
 <body>
-  <div style="text-align:left;display:inline-block;color:#eaeaea;min-width:340px;">
-    <div id="statusHeader" style="text-align:center;color:#eaeaea;margin-bottom:10px;">
-      <h2>Success - rebooting...</h2>
-      <h2>IMPORTANT: keep the board powered on until Owie WiFi becomes available again!</h2>
+  <main class="page update-page update-result">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark">OW</span>
+        <span class="brand-name">Owie</span>
+      </div>
+    </header>
+
+    <div class="status-icon success">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
     </div>
-  </div>
+    <h1>Update successful</h1>
+    <p class="page-lead">The board is rebooting into the new firmware. Keep it powered until WiFi comes back.</p>
+    <p class="footer-note">Redirecting in <span id="countdown">10</span>s</p>
+  </main>
+
+  <script>
+    var s = 10;
+    var el = document.getElementById('countdown');
+    setInterval(function () {
+      s -= 1;
+      if (el) el.textContent = Math.max(s, 0);
+    }, 1000);
+  </script>
 </body>
 
 </html>

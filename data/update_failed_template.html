@@ -1,23 +1,33 @@
 <!DOCTYPE html>
 <html lang="en">
-<!-- The HTML markup is based on the main page of Tasmota -->
 
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-    <title>Owie Failed</title>
-    <link rel="stylesheet" href="styles.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
+  <title>Owie Update - Failed</title>
+  <link rel="stylesheet" href="styles.css?v=6">
 </head>
 
 <body>
-    <div style="text-align:left;display:inline-block;color:#eaeaea;min-width:340px;">
-        <div id="statusHeader" style="text-align:center;color:#eaeaea;margin-bottom:10px;">
-            <h2>Update Failed: %UPDATE_ERROR%</h2>
-            <p>
-                <button onclick="history.back()">Back</button>
-            </p>
-        </div>
+  <main class="page update-page update-result">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark">OW</span>
+        <span class="brand-name">Owie</span>
+      </div>
+      <a class="topbar-link" href="/update">Back</a>
+    </header>
+
+    <div class="status-icon error">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M6 6l12 12M18 6L6 18" stroke-linecap="round" />
+      </svg>
     </div>
+    <h1>Update failed</h1>
+    <p class="page-lead">The firmware could not be flashed. Check the error and try again.</p>
+    <pre class="error-box">%UPDATE_ERROR%</pre>
+    <button onclick="history.back()">Try again</button>
+  </main>
 </body>
 
 </html>

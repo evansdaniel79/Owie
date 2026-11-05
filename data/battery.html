@@ -1,90 +1,99 @@
 <!DOCTYPE html>
 <html lang="en">
-<!-- The HTML markup is based on the main page of Tasmota -->
 
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
     <title>Owie - Battery</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css?v=5">
 </head>
 
 <body>
-    <div style="text-align:left;display:inline-block;color:#eaeaea;min-width:340px;">
-        <div id="statusHeader" style="text-align:center;color:#eaeaea;margin-bottom:10px;">
-            <h2>Owie Battery</h2>
+    <main class="page">
+        <header class="topbar">
+            <div class="brand">
+                <span class="brand-mark">OW</span>
+                <span class="brand-name">Owie</span>
+            </div>
+        </header>
+
+        <h1>Battery</h1>
+
+        <div class="section">
+            <table>
+                <tr>
+                    <th>SOC</th>
+                    <td>%OVERRIDDEN_SOC%%%</td>
+                </tr>
+                <tr>
+                    <th>Voltage based SOC</th>
+                    <td>%VOLTAGE_BASED_SOC%%%</td>
+                </tr>
+                <tr>
+                    <th>Lowest Ah-tracked SOC</th>
+                    <td>%BOTTOM_SOC%%%</td>
+                </tr>
+                <tr>
+                    <th>Highest Ah-tracked SOC</th>
+                    <td>%TOP_SOC%%%</td>
+                </tr>
+                <tr>
+                    <th>Ah-tracked range size</th>
+                    <td>%BOTTOM_MILLIAMP_HOURS% mAh</td>
+                </tr>
+                <tr>
+                    <th>Current discharge depth</th>
+                    <td>%CURRENT_MILLIAMP_HOURS% mAh</td>
+                </tr>
+            </table>
         </div>
-        <table>
-            <tr>
-                <th>SOC</th>
-                <td>%OVERRIDDEN_SOC%%%</td>
-            </tr>
-            <tr>
-                <th>Voltage based SOC</th>
-                <td>%VOLTAGE_BASED_SOC%%%</td>
-            </tr>
-            <tr>
-                <th>Lowest Ah-tracked SOC</th>
-                <td>%BOTTOM_SOC%%%</td>
-            </tr>
-            <tr>
-                <th>Highest Ah-tracked SOC</th>
-                <td>%TOP_SOC%%%</td>
-            </tr>
-            <tr>
-                <th>Ah-tracked range size</th>
-                <td>%BOTTOM_MILLIAMP_HOURS% mAh</td>
-            </tr>
-            <tr>
-                <th>Current discharge depth</th>
-                <td>%CURRENT_MILLIAMP_HOURS% mAh</td>
-            </tr>
-        </table>
-        <p></p>
-        <div style="text-align:center;margin-bottom:10px;">
-            <h3>BMS</h3>
+
+        <div class="section">
+            <h2 class="section-title">BMS</h2>
+            <table>
+                <tr>
+                    <th>Firmware version</th>
+                    <td>%BMS_FIRMWARE_VERSION%</td>
+                </tr>
+                <tr>
+                    <th>Hardware variant</th>
+                    <td>%BMS_VARIANT%</td>
+                </tr>
+                <tr>
+                    <th>Last shutdown reason</th>
+                    <td>%BMS_LAST_SHUTDOWN%</td>
+                </tr>
+                <tr>
+                    <th>Thresholds</th>
+                    <td>%BMS_THRESHOLDS%</td>
+                </tr>
+                <tr>
+                    <th>Balancing</th>
+                    <td>%BMS_BALANCING%</td>
+                </tr>
+                <tr>
+                    <th>Cycles</th>
+                    <td>%BMS_CYCLES%</td>
+                </tr>
+                <tr>
+                    <th>State of health</th>
+                    <td>%BMS_HEALTH%</td>
+                </tr>
+            </table>
         </div>
-        <table>
-            <tr>
-                <th>Firmware version</th>
-                <td>%BMS_FIRMWARE_VERSION%</td>
-            </tr>
-            <tr>
-                <th>Hardware variant</th>
-                <td>%BMS_VARIANT%</td>
-            </tr>
-            <tr>
-                <th>Last shutdown reason</th>
-                <td>%BMS_LAST_SHUTDOWN%</td>
-            </tr>
-            <tr>
-                <th>Thresholds</th>
-                <td>%BMS_THRESHOLDS%</td>
-            </tr>
-            <tr>
-                <th>Balancing</th>
-                <td>%BMS_BALANCING%</td>
-            </tr>
-            <tr>
-                <th>Cycles</th>
-                <td>%BMS_CYCLES%</td>
-            </tr>
-            <tr>
-                <th>State of health</th>
-                <td>%BMS_HEALTH%</td>
-            </tr>
-        </table>
-        <p></p>
-        <form method="post">
-            <input type="hidden" name="reset_stats">
-            <button>Reset stats</button>
-        </form>
-        <p></p>
-        <form method="post">
-            <input type="hidden" name="reset_settings">
-            <button>Reset Settings</button>
-        </form>
-    </div>
+
+        <div class="btn-row">
+            <form method="post">
+                <input type="hidden" name="reset_stats">
+                <button>Reset stats</button>
+            </form>
+            <form method="post">
+                <input type="hidden" name="reset_settings">
+                <button class="btn-secondary">Reset Settings</button>
+            </form>
+            <button class="btn-secondary" onclick="history.back()">Back</button>
+        </div>
+    </main>
 </body>
 
 </html>

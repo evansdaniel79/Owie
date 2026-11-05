@@ -1,26 +1,37 @@
 <!DOCTYPE html>
 <html lang="en">
-<!-- The HTML markup is based on the main page of Tasmota -->
 
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
     <title>Owie - BMS data monitor</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css?v=5">
 </head>
 
 <body>
-    <div style="text-align:left;display:inline-block;color:#eaeaea;min-width:340px;">
-        <div id="statusHeader" style="text-align:center;color:#eaeaea;margin-bottom:10px;">
-            <h2>Owie BMS data monitor</h2>
-            (%DISPLAY_AP_NAME%)
+    <main class="page page-wide">
+        <header class="topbar">
+            <div class="brand">
+                <span class="brand-mark">OW</span>
+                <span class="brand-name">Owie</span>
+            </div>
+            <span class="ap-name">%DISPLAY_AP_NAME%</span>
+        </header>
+
+        <h1>BMS Data Monitor</h1>
+
+        <textarea readonly="1" id="term" cols="340" name="t1" wrap="off" class="terminal"></textarea>
+
+        <div class="btn-row">
+            <button id="startstop" onclick="connect();">Connect</button>
+            <button class="btn-secondary" onclick="history.back()">Back</button>
         </div>
-        <textarea readonly="1" id="term" cols="340" name="t1" wrap="off"></textarea>
-        <button id="startstop" onclick="connect();">Connect</button>
-        <p>
-            <button onclick="history.back()">Back</button>
-        </p>
-        %PACKET_STATS_TABLE%
+
+        <div class="section">
+            <h2 class="section-title">Packet Stats</h2>
+            %PACKET_STATS_TABLE%
+        </div>
+
         <script>
             let packets = [];
             let lastError = '';
@@ -99,7 +110,7 @@
             window.setTimeout(connect, 0);
     //# sourceURL=monitor.js
         </script>
-    </div>
+    </main>
 </body>
 
 </html>

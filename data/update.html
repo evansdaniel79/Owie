@@ -1,27 +1,158 @@
 <!DOCTYPE html>
 <html lang="en">
-<!-- The HTML markup is based on the main page of Tasmota -->
 
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+  <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
   <title>Owie - Firmware Update</title>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=6">
 </head>
 
 <body>
-  <div style="text-align:left;display:inline-block;color:#eaeaea;min-width:340px;">
-    <div id="statusHeader" style="text-align:center;color:#eaeaea;margin-bottom:10px;">
-      <h2>Owie Update</h2>
+  <main class="page update-page">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark">OW</span>
+        <span class="brand-name">Owie</span>
+      </div>
+      <a class="topbar-link" href="/">Back</a>
+    </header>
+
+    <h1>Firmware Update</h1>
+    <p class="page-lead">Select a <code>.bin</code> file, then flash. Keep the board powered the whole time.</p>
+
+    <div class="update-progress" id="updateProgress" aria-hidden="true">
+      <span class="is-active" data-step="1"></span>
+      <span data-step="2"></span>
+      <span data-step="3"></span>
     </div>
-    <form method="post" action="/update" enctype="multipart/form-data">
-      <fieldset>
-        <legend>Upload your firmware:</legend>
-        <input type="file" name="firmware" accept=".bin,.bin.gz" onchange="this.form.submit()">
-      </fieldset>
-      <hr>
+
+    <form id="updateForm" method="post" action="/update" enctype="multipart/form-data">
+      <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="Choose firmware file">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+          <path d="M12 16V4M12 4l-4 4M12 4l4 4" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        <p class="dropzone-title">Choose firmware</p>
+        <p class="dropzone-hint">Tap to browse or drop a <code>.bin</code> file</p>
+      </div>
+      <input id="firmwareFile" type="file" name="firmware" accept=".bin,.bin.gz" class="visually-hidden">
+
+      <div id="readyState" class="ready-state hidden">
+        <div class="file-chip">
+          <div class="file-chip-meta">
+            <p class="ready-label">Selected file</p>
+            <p class="ready-filename" id="selectedFileName"></p>
+            <p class="ready-filesize" id="selectedFileSize"></p>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button type="submit" id="startUpdateBtn">Flash firmware</button>
+          <button type="button" id="changeFileBtn" class="btn-secondary">Choose different file</button>
+        </div>
+      </div>
+
+      <div id="uploadState" class="upload-state hidden">
+        <div class="spinner"></div>
+        <p class="upload-title">Flashing&hellip;</p>
+        <p class="upload-file" id="fileName"></p>
+        <div class="progress-track" aria-hidden="true"><div class="progress-bar"></div></div>
+        <p class="dropzone-hint">Stay on this page. Do not power off.</p>
+      </div>
     </form>
-  </div>
+  </main>
+
+  <script>
+    var dropzone = document.getElementById('dropzone');
+    var fileInput = document.getElementById('firmwareFile');
+    var form = document.getElementById('updateForm');
+    var fileNameEl = document.getElementById('fileName');
+    var selectedFileName = document.getElementById('selectedFileName');
+    var selectedFileSize = document.getElementById('selectedFileSize');
+    var readyState = document.getElementById('readyState');
+    var uploadState = document.getElementById('uploadState');
+    var changeFileBtn = document.getElementById('changeFileBtn');
+    var steps = document.querySelectorAll('#updateProgress span');
+
+    function setStep(n) {
+      for (var i = 0; i < steps.length; i++) {
+        var el = steps[i];
+        var step = parseInt(el.getAttribute('data-step'), 10);
+        el.classList.toggle('is-active', step === n);
+        el.classList.toggle('is-done', step < n);
+      }
+    }
+
+    function formatBytes(bytes) {
+      if (!bytes && bytes !== 0) return '';
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / 1048576).toFixed(2) + ' MB';
+    }
+
+    function showSelected(file) {
+      if (!file) return;
+      selectedFileName.textContent = file.name;
+      selectedFileSize.textContent = formatBytes(file.size);
+      dropzone.classList.add('hidden');
+      uploadState.classList.add('hidden');
+      readyState.classList.remove('hidden');
+      setStep(2);
+    }
+
+    function startUpload() {
+      var file = fileInput.files && fileInput.files[0];
+      if (!file) return false;
+      fileNameEl.textContent = file.name;
+      readyState.classList.add('hidden');
+      dropzone.classList.add('hidden');
+      uploadState.classList.remove('hidden');
+      setStep(3);
+      return true;
+    }
+
+    dropzone.addEventListener('click', function () { fileInput.click(); });
+    dropzone.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        fileInput.click();
+      }
+    });
+    fileInput.addEventListener('change', function () { showSelected(fileInput.files[0]); });
+    changeFileBtn.addEventListener('click', function () { fileInput.click(); });
+    form.addEventListener('submit', function (e) {
+      if (!fileInput.files || !fileInput.files[0]) {
+        e.preventDefault();
+        return;
+      }
+      startUpload();
+    });
+
+    ['dragenter', 'dragover'].forEach(function (evt) {
+      dropzone.addEventListener(evt, function (e) {
+        e.preventDefault();
+        dropzone.classList.add('dragover');
+      });
+    });
+    ['dragleave', 'drop'].forEach(function (evt) {
+      dropzone.addEventListener(evt, function (e) {
+        e.preventDefault();
+        dropzone.classList.remove('dragover');
+      });
+    });
+    dropzone.addEventListener('drop', function (e) {
+      var file = e.dataTransfer.files[0];
+      if (!file) return;
+      try {
+        fileInput.files = e.dataTransfer.files;
+      } catch (err) {
+        var dt = new DataTransfer();
+        dt.items.add(file);
+        fileInput.files = dt.files;
+      }
+      showSelected(file);
+    });
+  </script>
 </body>
 
 </html>

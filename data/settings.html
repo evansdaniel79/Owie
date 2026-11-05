@@ -1,76 +1,74 @@
 <!DOCTYPE html>
 <html lang="en">
-<!-- The HTML markup is based on the main page of Tasmota -->
 
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
   <title>Owie - Settings</title>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=5">
 </head>
 
 <body>
-  <div style="text-align:left;display:inline-block;color:#eaeaea;min-width:340px;">
-    <div id="statusHeader" style="text-align:center;color:#eaeaea;margin-bottom:10px;">
-      <h2>Owie Settings</h2>
-      (%DISPLAY_AP_NAME%)
-    </div>
+  <main class="page">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark">OW</span>
+        <span class="brand-name">Owie</span>
+      </div>
+      <span class="ap-name">%DISPLAY_AP_NAME%</span>
+    </header>
+
+    <h1>Settings</h1>
+
     <form method="post" action="/settings" id="settingsForm">
-      <fieldset>
-        <legend>WiFi options:</legend>
-        <p>Owie WiFi network name override:<br><input placeholder="WiFi network name" value="%AP_SELF_NAME%"
-            name="apselfname"></p>
-        <p>Password:<br><input placeholder="Between 8 and 31 characters" value="%AP_PASSWORD%" name="pw"></p>
-        <p>Power (dBm):<br>
+      <div class="section">
+        <h2 class="section-title">WiFi Options</h2>
+        <div class="field">
+          <label>Owie WiFi network name override</label>
+          <input placeholder="WiFi network name" value="%AP_SELF_NAME%" name="apselfname">
+        </div>
+        <div class="field">
+          <label>Password</label>
+          <input placeholder="Between 8 and 31 characters" value="%AP_PASSWORD%" name="pw">
+        </div>
+        <div class="field">
+          <label>Power (dBm)</label>
           <select value="%WIFI_POWER%" name="wifipower">
             %WIFI_POWER_OPTIONS%
           </select>
-      </fieldset>
-      <fieldset>
-        <legend>Board locking:</legend>
-        <p id="lockingMsg"></p>
-        <button onclick="toggleArming(this)" id="armBtn" style="display:none" data-canenable="%CAN_ENABLE_LOCKING%"
-          data-enabled="%LOCKING_ENABLED%">
+        </div>
+      </div>
+
+      <div class="section">
+        <h2 class="section-title">Board Locking</h2>
+        <p id="lockingMsg" class="field-hint" style="margin-bottom:12px;"></p>
+        <button onclick="toggleArming(this)" id="armBtn" style="display:none" class="btn-secondary"
+          data-canenable="%CAN_ENABLE_LOCKING%" data-enabled="%LOCKING_ENABLED%">
           Disabled
         </button>
-      </fieldset>
-      <fieldset>
-        <legend>Stock battery mode:</legend>
-        <label class="switch-row">
-          <span>Use stock battery behavior</span>
-          <span class="switch">
-            <input type="checkbox" name="stockmode" value="1" %STOCK_MODE_CHECKED%>
-            <span class="slider"></span>
-          </span>
-        </label>
-        <p class="note">Only use this if you want the stock functionality back and have a NON-upgraded battery.
-          Restores regen, the range estimator and the board's own battery percentage. Applied on Save.</p>
-      </fieldset>
-      <fieldset>
-        <legend>Firmware Update:</legend>
-        <input id="updInput" type="file" name="firmware" accept=".bin,.bin.gz">
-      </fieldset>
-      <hr>
+      </div>
+
+      <div class="section">
+        <h2 class="section-title">Stock Battery Mode</h2>
+        <label class="switch-row"><span>Use stock battery behavior</span><span class="switch"><input type="checkbox" name="stockmode" value="1" %STOCK_MODE_CHECKED%><span class="slider"></span></span></label>
+        <p class="field-hint">Only use this if you want the stock functionality back and have a NON-upgraded battery. Restores regen, the range estimator and the board's own battery percentage. Applied on Save.</p>
+      </div>
+
       <button>Save</button>
     </form>
-    <p></p>
-    <form action="/dev_settings">
-      <button>Developer Settings</button>
-    </form>
-    <p>
-      <button onclick="history.back()">Back</button>
-    </p>
+
+    <div class="btn-row">
+      <form action="/update">
+        <button>Firmware Update</button>
+      </form>
+      <form action="/dev_settings">
+        <button class="btn-secondary">Developer Settings</button>
+      </form>
+      <button class="btn-secondary" onclick="history.back()">Back</button>
+    </div>
+
     <script>
       (() => {
-        document.getElementById("updInput").onchange = () => {
-          const form = document.getElementById("settingsForm");
-          form.setAttribute("enctype", "multipart/form-data");
-          const oldAction = form.getAttribute("action");
-          form.setAttribute("action", "/update");
-          form.submit();
-          form.setAttribute("action", oldAction);
-        };
-
         const cannotLockMsg = "First set WiFi password above and save settings to enable board locking.";
         const lockingEnabledMsg = "Locking is enabled! To lock the board, turn it on and off in less than 5 seconds.";
         const lockingDisabledMsg = "Locking is disabled."
@@ -109,7 +107,7 @@
       })();
   //# sourceURL=settings.js
     </script>
-  </div>
+  </main>
 </body>
 
 </html>
