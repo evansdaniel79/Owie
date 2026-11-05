@@ -5,6 +5,12 @@ on:
     tags:
       - "v*"
 
+# The called build workflow has a job that asks for these; a caller must grant
+# at least what the called workflow requests, otherwise the run fails at startup.
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
   build-and-test:
     name: "Build and test all"
