@@ -107,14 +107,16 @@
         <div class="btn-row">
             <form method="post">
                 <input type="hidden" name="reset_stats">
-                <button>Reset stats</button>
+                <button>Reset battery tracking</button>
             </form>
             <form method="post">
                 <input type="hidden" name="reset_settings">
-                <button class="btn-secondary">Reset Settings</button>
+                <button class="btn-secondary">Clear saved battery data</button>
             </form>
             <button class="btn-secondary" onclick="history.back()">Back</button>
         </div>
+
+        <p class="field-hint">Reset battery tracking restarts Owie's Ah-tracked charge estimate from now. Clear saved battery data erases the copy kept in flash that is loaded at next boot. Neither touches your WiFi or other settings.</p>
     </main>
 </body>
 

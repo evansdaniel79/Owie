@@ -168,6 +168,28 @@ const char *lockedStatusDataAttrValue() {
   return Settings->is_locked ? "1" : "";
 };
 
+// The async web server re-scans every value it substitutes into a page, so a
+// '%' in a value is read as the start of another placeholder and breaks the
+// page ("UNKNOWN PLACEHOLDER"). Values that may contain '%' (or markup) go
+// through this so they can never do that.
+String htmlSafe(const String &in) {
+  String out;
+  out.reserve(in.length() + 8);
+  for (unsigned i = 0; i < in.length(); i++) {
+    const char c = in[i];
+    switch (c) {
+      case '%': out.concat("&#37;"); break;
+      case '&': out.concat("&amp;"); break;
+      case '<': out.concat("&lt;"); break;
+      case '>': out.concat("&gt;"); break;
+      case '"': out.concat("&quot;"); break;
+      case '\'': out.concat("&#39;"); break;
+      default: out.concat(c);
+    }
+  }
+  return out;
+}
+
 String templateProcessor(const String &var) {
   if (var == "TOTAL_VOLTAGE") {
     return String(relay->getTotalVoltageMillivolts() / 1000.0,
@@ -257,9 +279,9 @@ String templateProcessor(const String &var) {
     if (!relay->hasCycleInfo()) {
       return "n/a";
     }
-    return String(relay->getStateOfHealthPercent()) + "%";
+    return String(relay->getStateOfHealthPercent()) + "&#37;";
   } else if (var == "SSID") {
-    return Settings->ap_name;
+    return htmlSafe(Settings->ap_name);
   } else if (var == "PASS") {
     if (strlen(Settings->ap_password) > 0) {
       return defaultPass;
@@ -308,9 +330,9 @@ String templateProcessor(const String &var) {
     snprintf(hexBuf, sizeof(hexBuf), "0x%X", relay->getBMSSerialOverride());
     return String(hexBuf);
   } else if (var == "AP_PASSWORD") {
-    return Settings->ap_self_password;
+    return htmlSafe(Settings->ap_self_password);
   } else if (var == "AP_SELF_NAME") {
-    return Settings->ap_self_name;
+    return htmlSafe(Settings->ap_self_name);
   } else if (var == "DISPLAY_AP_NAME") {
     char apDisplayName[64];
     if (strlen(Settings->ap_self_name) > 0) {
@@ -320,7 +342,7 @@ String templateProcessor(const String &var) {
       snprintf(apDisplayName, sizeof(apDisplayName), "Owie-%04X",
                ESP.getChipId() & 0xFFFF);
     }
-    return String(apDisplayName);
+    return htmlSafe(String(apDisplayName));
   } else if (var == "WIFI_POWER") {
     return String(Settings->wifi_power);
   } else if (var == "WIFI_POWER_OPTIONS") {
