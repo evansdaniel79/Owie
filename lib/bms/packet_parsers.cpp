@@ -64,6 +64,9 @@ void BmsRelay::currentParser(Packet& p) {
   // -> 54.9 mA/count) and the BMS's own state-of-charge full-scale
   // constants, so it applies to XR and Pint boards alike.
   current_milliamps_ = int16FromNetworkOrder(p.data()) * CURRENT_SCALER;
+  if (current_milliamps_ > max_current_milliamps_) {
+    max_current_milliamps_ = current_milliamps_;
+  }
   battery_fuel_gauge_.updateCurrent(current_milliamps_, now_millis_);
 }
 

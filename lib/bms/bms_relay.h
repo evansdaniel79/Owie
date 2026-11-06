@@ -149,6 +149,12 @@ class BmsRelay {
    */
   int32_t getCurrentMilliamps() { return current_milliamps_; }
 
+  /**
+   * @brief Highest discharge current seen since Owie started (this power
+   * cycle), in milliamps. Regen (negative current) never lowers it.
+   */
+  int32_t getMaxCurrentMilliamps() { return max_current_milliamps_; }
+
   int32_t getUsedChargeMah() {
     return battery_fuel_gauge_.getMilliampSecondsDischarged() / 3600;
   }
@@ -262,6 +268,7 @@ class BmsRelay {
   uint32_t serial_override_ = 0;
   uint32_t captured_serial_ = 0;
   int16_t current_milliamps_ = 0;
+  int16_t max_current_milliamps_ = 0;
 
   int8_t bms_soc_percent_ = -1;
   int8_t overridden_soc_percent_ = -1;

@@ -8,7 +8,7 @@ import http.server, json, os, re, sys
 DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
 CELLS = "".join(f"<tr><th>Cell {i+1}</th><td>{3.92+i*0.003:.3f}v</td></tr>" for i in range(15))
 VALS = {
-    "TOTAL_VOLTAGE": "58.84", "CURRENT_AMPS": "1.2", "BMS_SOC": "71", "OVERRIDDEN_SOC": "68",
+    "TOTAL_VOLTAGE": "58.84", "CURRENT_AMPS": "1.2", "MAX_CURRENT_AMPS": "18.4", "BMS_SOC": "71", "OVERRIDDEN_SOC": "68",
     "VOLTAGE_BASED_SOC": "69", "BOTTOM_SOC": "10", "TOP_SOC": "95", "BOTTOM_MILLIAMP_HOURS": "2500",
     "CURRENT_MILLIAMP_HOURS": "800", "USED_CHARGE_MAH": "1234", "REGENERATED_CHARGE_MAH": "210",
     "UPTIME": "0d 0h 12m 3s", "GRACEFUL_SHUTDOWN_COUNT": "4", "OWIE_version": "1.7.0",

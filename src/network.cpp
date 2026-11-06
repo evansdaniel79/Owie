@@ -134,6 +134,8 @@ String generateOwieStatusJson() {
       String(relay->getTotalVoltageMillivolts() / 1000.0, 2) + "v";
   status["CURRENT_AMPS"] =
       String(relay->getCurrentMilliamps() / 1000.0, 1) + " Amps";
+  status["MAX_CURRENT_AMPS"] =
+      String(relay->getMaxCurrentMilliamps() / 1000.0, 1) + " Amps";
   status["BMS_SOC"] = String(relay->getBmsReportedSOC()) + "%";
   status["OVERRIDDEN_SOC"] = String(relay->getOverriddenSOC()) + "%";
   status["USED_CHARGE_MAH"] = String(relay->getUsedChargeMah()) + " mAh";
@@ -196,6 +198,9 @@ String templateProcessor(const String &var) {
                   /* decimalPlaces = */ 2);
   } else if (var == "CURRENT_AMPS") {
     return String(relay->getCurrentMilliamps() / 1000.0,
+                  /* decimalPlaces = */ 1);
+  } else if (var == "MAX_CURRENT_AMPS") {
+    return String(relay->getMaxCurrentMilliamps() / 1000.0,
                   /* decimalPlaces = */ 1);
   } else if (var == "BMS_SOC") {
     return String(relay->getBmsReportedSOC());
