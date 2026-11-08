@@ -12,8 +12,11 @@
 #include "battery_pack.h"
 #include "bms_relay.h"
 #include "data.h"
+#include "ride_logger.h"
 #include "settings.h"
 #include "task_queue.h"
+
+extern RideLogger rideLogger;  // defined in bms_main.cpp
 
 namespace {
 DNSServer dnsServer;
@@ -165,33 +168,6 @@ String generateOwieStatusJson() {
   return jsonOutput;
 }
 
-// Raw numbers (no units or HTML) for the ride logger on the Advanced Info page.
-String generateLiveJson() {
-  DynamicJsonDocument doc(1024);
-  const uint16_t *cells = relay->getCellMillivolts();
-  const uint8_t *temps = relay->getTemperaturesCelsius();
-  doc["ms"] = millis();
-  doc["mv"] = relay->getTotalVoltageMillivolts();
-  doc["ma"] = relay->getCurrentMilliamps();
-  doc["maxma"] = relay->getMaxCurrentMilliamps();
-  doc["soc"] = relay->getOverriddenSOC();
-  doc["bmssoc"] = relay->getBmsReportedSOC();
-  doc["vsoc"] = relay->getBatteryFuelGauge().getVoltageBasedSoc();
-  doc["usedmah"] = relay->getUsedChargeMah();
-  doc["regenmah"] = relay->getRegeneratedChargeMah();
-  JsonArray c = doc.createNestedArray("cells");
-  for (int i = 0; i < 15; i++) {
-    c.add(cells[i]);
-  }
-  JsonArray t = doc.createNestedArray("temps");
-  for (int i = 0; i < 5; i++) {
-    t.add(temps[i]);  // 255 = sensor invalid; index 4 is the BMS board
-  }
-  String out;
-  serializeJson(doc, out);
-  return out;
-}
-
 bool lockingPreconditionsMet() {
   return strlen(Settings->ap_self_password) > 0;
 }
@@ -228,6 +204,15 @@ String templateProcessor(const String &var) {
   } else if (var == "CURRENT_AMPS") {
     return String(relay->getCurrentMilliamps() / 1000.0,
                   /* decimalPlaces = */ 1);
+  } else if (var == "RIDELOG_STATUS") {
+    if (!rideLogger.active()) {
+      return "Not available (not enough free memory on the board).";
+    }
+    const unsigned minutes = rideLogger.size() * RideLogger::INTERVAL_MS / 60000;
+    const unsigned keepMinutes =
+        rideLogger.capacity() * RideLogger::INTERVAL_MS / 60000;
+    return "Recording automatically: " + String(minutes) +
+           " min stored (keeps the latest " + String(keepMinutes) + " min).";
   } else if (var == "LEARN_STATUS") {
     const auto &gauge = relay->getBatteryFuelGauge();
     if (gauge.isLearned()) {
@@ -496,8 +481,45 @@ void setupWebServer(BmsRelay *bmsRelay) {
     request->send(200, "application/json", out);
   });
 
-  webServer.on("/live", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send(200, "application/json", generateLiveJson());
+  webServer.on("/ridelog.csv", HTTP_GET, [](AsyncWebServerRequest *request) {
+    AsyncWebServerResponse *response = request->beginChunkedResponse(
+        "text/csv",
+        [](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
+          // Rows are produced on the fly; `index` is the byte offset, so a
+          // fresh download (index 0) restarts the state. One download at a
+          // time is expected.
+          static size_t nextRow;
+          static bool headerSent;
+          static String pending;
+          if (index == 0) {
+            nextRow = 0;
+            headerSent = false;
+            pending = "";
+          }
+          if (!headerSent) {
+            pending = "t_s,mv,ma_avg,ma_peak,min_cell_mv,max_cell_mv,soc,"
+                      "bms_soc,voltage_soc,temp_max_c\n";
+            headerSent = true;
+          }
+          while (pending.length() < maxLen && nextRow < rideLogger.size()) {
+            const RideLogger::Sample &s = rideLogger.at(nextRow);
+            char line[96];
+            snprintf(line, sizeof(line), "%u,%u,%d,%d,%u,%u,%d,%d,%d,%u\n",
+                     (unsigned)rideLogger.secondsAt(nextRow), s.total_mv,
+                     s.current_ma_avg, s.current_ma_peak, s.min_cell_mv,
+                     s.max_cell_mv, s.soc, s.bms_soc, s.voltage_soc,
+                     s.temp_max_c);
+            pending.concat(line);
+            nextRow++;
+          }
+          const size_t n = std::min<size_t>(maxLen, pending.length());
+          memcpy(buffer, pending.c_str(), n);
+          pending.remove(0, n);
+          return n;  // 0 ends the response once everything has been sent
+        });
+    response->addHeader("Content-Disposition",
+                        "attachment; filename=\"owie-ride-log.csv\"");
+    request->send(response);
   });
 
   webServer.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
@@ -524,7 +546,9 @@ void setupWebServer(BmsRelay *bmsRelay) {
                         BATTERY_HTML_SIZE, templateProcessor);
         return;
       case HTTP_POST:
-        if (request->getParam("relearn", true) != nullptr) {
+        if (request->getParam("clear_ridelog", true) != nullptr) {
+          rideLogger.clear();
+        } else if (request->getParam("relearn", true) != nullptr) {
           // Forget everything learned about this battery, in memory and in the
           // copy saved in flash, and start learning again.
           relay->getBatteryFuelGauge().reset();

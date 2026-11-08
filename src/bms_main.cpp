@@ -1,9 +1,12 @@
 #include <Arduino.h>
 
+#include <algorithm>
+
 #include "battery_fuel_gauge.h"
 #include "bms_relay.h"
 #include "network.h"
 #include "packet.h"
+#include "ride_logger.h"
 #include "settings.h"
 #include "task_queue.h"
 
@@ -27,6 +30,7 @@ HardwareSerial Serial(0);
 }  // namespace
 
 BmsRelay *relay;
+RideLogger rideLogger;
 
 void bms_setup() {
   relay = new BmsRelay([]() { return Serial.read(); },
@@ -110,4 +114,49 @@ void bms_setup() {
   setupWifi();
   setupWebServer(relay);
   TaskQueue.postRecurringTask([]() { relay->loop(); });
+
+  // On-board ride log (see ride_logger.h). Sized from the memory left over once
+  // WiFi and the web server are up, keeping a generous reserve for them; if
+  // there is not enough, logging is simply off.
+  constexpr uint32_t HEAP_RESERVE_BYTES = 26000;
+  constexpr size_t MAX_SAMPLES = 1000;
+  const uint32_t freeHeap = ESP.getFreeHeap();
+  rideLogger.begin(freeHeap > HEAP_RESERVE_BYTES
+                       ? std::min<size_t>(MAX_SAMPLES,
+                                          (freeHeap - HEAP_RESERVE_BYTES) /
+                                              sizeof(RideLogger::Sample))
+                       : 0);
+  TaskQueue.postRecurringTask([]() {
+    static uint32_t lastMillis = 0;
+    const uint32_t now = millis();
+    if (now - lastMillis < 250) {
+      return;
+    }
+    lastMillis = now;
+    const uint16_t *cells = relay->getCellMillivolts();
+    uint16_t minCell = 0xFFFF, maxCell = 0;
+    for (int i = 0; i < 15; i++) {
+      minCell = std::min(minCell, cells[i]);
+      maxCell = std::max(maxCell, cells[i]);
+    }
+    if (relay->getTotalVoltageMillivolts() == 0 || maxCell == 0) {
+      return;  // nothing received from the BMS yet
+    }
+    const uint8_t *temps = relay->getTemperaturesCelsius();
+    uint8_t tempMax = 0;
+    bool tempValid = false;
+    for (int i = 0; i < 5; i++) {
+      if (i == BmsRelay::BOARD_TEMPERATURE_INDEX ||
+          temps[i] == BmsRelay::TEMPERATURE_INVALID) {
+        continue;
+      }
+      tempValid = true;
+      tempMax = std::max(tempMax, temps[i]);
+    }
+    rideLogger.observe(
+        now, relay->getTotalVoltageMillivolts(), relay->getCurrentMilliamps(),
+        minCell, maxCell, relay->getOverriddenSOC(), relay->getBmsReportedSOC(),
+        relay->getBatteryFuelGauge().getVoltageBasedSoc(),
+        tempValid ? tempMax : 255);
+  });
 }

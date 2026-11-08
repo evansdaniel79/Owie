@@ -138,9 +138,20 @@
 
         <div class="section">
             <h2 class="section-title">Ride Log</h2>
-            <p class="field-hint" style="margin:0 0 12px">Records voltage, current and temperatures once a second while this page stays open on your phone, then saves a CSV file. Used to improve the battery percentage and range estimate.</p>
-            <p id="logStatus" class="field-hint" style="margin:0 0 12px">Not recording.</p>
+            <p class="field-hint" style="margin:0 0 12px">The board records voltage, current and temperatures by itself, so your phone can stay in your pocket with the screen off. After the ride, leave the board on, connect to Owie and download the log. It is lost when the board powers off.</p>
+            <p class="field-hint" style="margin:0 0 12px">%RIDELOG_STATUS%</p>
             <div class="btn-row">
+                <form action="/ridelog.csv">
+                    <button>Download ride log (CSV)</button>
+                </form>
+                <form method="post" onsubmit="return confirm('Clear the ride log?');">
+                    <input type="hidden" name="clear_ridelog">
+                    <button class="btn-secondary">Clear ride log</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="btn-row">
                 <button type="button" id="logToggle">Start recording</button>
                 <button type="button" id="logDownload" class="btn-secondary" disabled>Download CSV</button>
             </div>
@@ -156,64 +167,6 @@
 
         <p class="field-hint">Battery learning shows whether Owie has seen enough of your pack's range to calibrate its percentage. Relearn battery forgets all of it and starts over, for example after changing the battery. It does not touch your WiFi or other settings.</p>
     </main>
-    <script>
-        (function () {
-            var rows = [], timer = null, lock = null, fails = 0;
-            var btn = document.getElementById('logToggle');
-            var dl = document.getElementById('logDownload');
-            var status = document.getElementById('logStatus');
-            var header = ['phone_time', 'ms', 'mv', 'ma', 'maxma', 'soc', 'bmssoc', 'vsoc', 'usedmah', 'regenmah'];
-            var i;
-            for (i = 1; i <= 15; i++) header.push('cell' + i);
-            for (i = 1; i <= 5; i++) header.push('temp' + i);
-
-            function say(t) { status.textContent = t; }
-            function sample() {
-                var x = new XMLHttpRequest();
-                x.open('GET', '/live');
-                x.timeout = 2000;
-                x.onload = function () {
-                    try {
-                        var d = JSON.parse(x.responseText);
-                        rows.push([new Date().toISOString(), d.ms, d.mv, d.ma, d.maxma, d.soc, d.bmssoc, d.vsoc, d.usedmah, d.regenmah].concat(d.cells, d.temps).join(','));
-                        fails = 0;
-                        say('Recording: ' + rows.length + ' samples. Keep this page open.');
-                    } catch (e) { fails++; }
-                };
-                x.onerror = x.ontimeout = function () {
-                    fails++;
-                    say('Connection problem (' + fails + ' missed). ' + rows.length + ' samples kept.');
-                };
-                x.send();
-            }
-            function start() {
-                timer = setInterval(sample, 1000);
-                btn.textContent = 'Stop recording';
-                try { if (navigator.wakeLock) navigator.wakeLock.request('screen').then(function (l) { lock = l; }, function () { }); } catch (e) { }
-                say('Recording...');
-            }
-            function stop() {
-                clearInterval(timer);
-                timer = null;
-                try { if (lock) { lock.release(); lock = null; } } catch (e) { }
-                btn.textContent = 'Start recording';
-                dl.disabled = rows.length === 0;
-                say('Stopped. ' + rows.length + ' samples ready to download.');
-            }
-            btn.onclick = function () {
-                if (timer) { stop(); } else { rows = []; dl.disabled = true; start(); }
-            };
-            dl.onclick = function () {
-                var blob = new Blob([header.join(',') + '\n' + rows.join('\n') + '\n'], { type: 'text/csv' });
-                var a = document.createElement('a');
-                a.href = URL.createObjectURL(blob);
-                a.download = 'owie-ride-' + new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-') + '.csv';
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-            };
-        })();
-    </script>
 </body>
 
 </html>
