@@ -49,9 +49,11 @@
       </div>
 
       <div class="section">
-        <h2 class="section-title">Stock Battery Mode</h2>
-        <label class="switch-row"><span>Use stock battery behavior</span><span class="switch"><input type="checkbox" name="stockmode" value="1" id="stockmode"><span class="slider"></span></span></label>
-        <p class="field-hint">Only use this if you want the stock functionality back and have a NON-upgraded battery. Restores regen, the range estimator and the board's own battery percentage. Applied on Save.</p>
+        <h2 class="section-title">Stock Battery Behavior</h2>
+        <label class="switch-row"><span>Stock regen &amp; range estimator</span><span class="switch"><input type="checkbox" name="stock_regen" value="1" id="stock_regen"><span class="slider"></span></span></label>
+        <p class="field-hint">Gives the Onewheel app its regen readout and Future Motion's range estimator back. Only for a NON-upgraded battery.</p>
+        <label class="switch-row" style="margin-top:16px"><span>Future Motion battery percentage</span><span class="switch"><input type="checkbox" name="stock_soc" value="1" id="stock_soc"><span class="slider"></span></span></label>
+        <p class="field-hint">Uses the board's own battery percentage instead of Owie's. Only for a NON-upgraded battery. Both switches are off by default. Applied on Save.</p>
       </div>
 
       <button>Save</button>
@@ -72,7 +74,10 @@
         const sm = new XMLHttpRequest();
         sm.open("GET", "/stockmode");
         sm.onload = () => {
-          if (sm.status === 200) document.getElementById("stockmode").checked = sm.responseText === "1";
+          if (sm.status === 200) {
+            document.getElementById("stock_regen").checked = sm.responseText.charAt(0) === "1";
+            document.getElementById("stock_soc").checked = sm.responseText.charAt(1) === "1";
+          }
         };
         sm.send();
       })();

@@ -43,7 +43,7 @@ class H(http.server.BaseHTTPRequestHandler):
         if p in PAGES: return self.send(render(PAGES[p]))
         if p == "/styles.css": return self.send(open(os.path.join(DATA, "styles.css")).read(), "text/css")
         if p == "/autoupdate": return self.send(json.dumps({k: VALS[k] for k in VALS if k.isupper() or k == "OWIE_version"}), "application/json")
-        if p == "/stockmode": return self.send("0", "text/plain")
+        if p == "/stockmode": return self.send("00", "text/plain")
         if p == "/lock": return self.send("1" if "toggleArm" in self.path else "ok", "text/plain")
         self.send_response(404); self.end_headers()
     def do_POST(self):

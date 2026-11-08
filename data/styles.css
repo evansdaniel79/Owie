@@ -666,3 +666,30 @@ form + .btn-row {
     transform: translateX(20px);
     background: #fff;
 }
+
+details.section > summary {
+    cursor: pointer;
+    list-style: none;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+}
+
+details.section > summary::-webkit-details-marker {
+    display: none;
+}
+
+details.section > summary::after {
+    content: "+";
+    float: right;
+}
+
+details.section[open] > summary::after {
+    content: "\2212";
+}
+
+details.section > table {
+    margin-top: 12px;
+}

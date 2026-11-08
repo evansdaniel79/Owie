@@ -469,9 +469,12 @@ void setupWebServer(BmsRelay *bmsRelay) {
                     MONITOR_HTML_SIZE, templateProcessor);
   });
   webServer.on("/stockmode", HTTP_GET, [](AsyncWebServerRequest *request) {
-    const bool on = Settings->pass_through_soc && Settings->pass_through_current &&
-                    Settings->pass_through_status;
-    request->send(200, "text/plain", on ? "1" : "0");
+    // Two characters: stock regen/range estimator, then Future Motion SOC.
+    const bool regen =
+        Settings->pass_through_current && Settings->pass_through_status;
+    String state = regen ? "1" : "0";
+    state.concat(Settings->pass_through_soc ? "1" : "0");
+    request->send(200, "text/plain", state);
   });
   webServer.on("/settings", HTTP_ANY, [](AsyncWebServerRequest *request) {
     switch (request->method()) {
@@ -515,10 +518,12 @@ void setupWebServer(BmsRelay *bmsRelay) {
         Settings->wifi_power = wifiPower->value().toInt();
         // Unchecked checkboxes aren't sent in the form post, so a missing
         // param means "off".
-        const bool stockMode = request->getParam("stockmode", true) != nullptr;
-        Settings->pass_through_soc = stockMode;
-        Settings->pass_through_current = stockMode;
-        Settings->pass_through_status = stockMode;
+        const bool stockRegen =
+            request->getParam("stock_regen", true) != nullptr;
+        Settings->pass_through_current = stockRegen;
+        Settings->pass_through_status = stockRegen;
+        Settings->pass_through_soc =
+            request->getParam("stock_soc", true) != nullptr;
         snprintf(Settings->ap_self_password, sizeof(Settings->ap_self_password),
                  "%s", apSelfPassword->value().c_str());
         snprintf(Settings->ap_self_name, sizeof(Settings->ap_self_name), "%s",
