@@ -105,6 +105,16 @@
             </table>
         </details>
 
+        <div class="section">
+            <h2 class="section-title">Ride Log</h2>
+            <p class="field-hint" style="margin:0 0 12px">Records voltage, current and temperatures once a second while this page stays open on your phone, then saves a CSV file. Used to improve the battery percentage and range estimate.</p>
+            <p id="logStatus" class="field-hint" style="margin:0 0 12px">Not recording.</p>
+            <div class="btn-row">
+                <button type="button" id="logToggle">Start recording</button>
+                <button type="button" id="logDownload" class="btn-secondary" disabled>Download CSV</button>
+            </div>
+        </div>
+
         <div class="btn-row">
             <form method="post">
                 <input type="hidden" name="reset_stats">
@@ -119,6 +129,64 @@
 
         <p class="field-hint">Reset battery tracking restarts Owie's Ah-tracked charge estimate from now. Clear saved battery data erases the copy kept in flash that is loaded at next boot. Neither touches your WiFi or other settings.</p>
     </main>
+    <script>
+        (function () {
+            var rows = [], timer = null, lock = null, fails = 0;
+            var btn = document.getElementById('logToggle');
+            var dl = document.getElementById('logDownload');
+            var status = document.getElementById('logStatus');
+            var header = ['phone_time', 'ms', 'mv', 'ma', 'maxma', 'soc', 'bmssoc', 'vsoc', 'usedmah', 'regenmah'];
+            var i;
+            for (i = 1; i <= 15; i++) header.push('cell' + i);
+            for (i = 1; i <= 5; i++) header.push('temp' + i);
+
+            function say(t) { status.textContent = t; }
+            function sample() {
+                var x = new XMLHttpRequest();
+                x.open('GET', '/live');
+                x.timeout = 2000;
+                x.onload = function () {
+                    try {
+                        var d = JSON.parse(x.responseText);
+                        rows.push([new Date().toISOString(), d.ms, d.mv, d.ma, d.maxma, d.soc, d.bmssoc, d.vsoc, d.usedmah, d.regenmah].concat(d.cells, d.temps).join(','));
+                        fails = 0;
+                        say('Recording: ' + rows.length + ' samples. Keep this page open.');
+                    } catch (e) { fails++; }
+                };
+                x.onerror = x.ontimeout = function () {
+                    fails++;
+                    say('Connection problem (' + fails + ' missed). ' + rows.length + ' samples kept.');
+                };
+                x.send();
+            }
+            function start() {
+                timer = setInterval(sample, 1000);
+                btn.textContent = 'Stop recording';
+                try { if (navigator.wakeLock) navigator.wakeLock.request('screen').then(function (l) { lock = l; }, function () { }); } catch (e) { }
+                say('Recording...');
+            }
+            function stop() {
+                clearInterval(timer);
+                timer = null;
+                try { if (lock) { lock.release(); lock = null; } } catch (e) { }
+                btn.textContent = 'Start recording';
+                dl.disabled = rows.length === 0;
+                say('Stopped. ' + rows.length + ' samples ready to download.');
+            }
+            btn.onclick = function () {
+                if (timer) { stop(); } else { rows = []; dl.disabled = true; start(); }
+            };
+            dl.onclick = function () {
+                var blob = new Blob([header.join(',') + '\n' + rows.join('\n') + '\n'], { type: 'text/csv' });
+                var a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = 'owie-ride-' + new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-') + '.csv';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            };
+        })();
+    </script>
 </body>
 
 </html>

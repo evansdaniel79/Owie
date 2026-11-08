@@ -163,6 +163,33 @@ String generateOwieStatusJson() {
   return jsonOutput;
 }
 
+// Raw numbers (no units or HTML) for the ride logger on the Advanced Info page.
+String generateLiveJson() {
+  DynamicJsonDocument doc(1024);
+  const uint16_t *cells = relay->getCellMillivolts();
+  const uint8_t *temps = relay->getTemperaturesCelsius();
+  doc["ms"] = millis();
+  doc["mv"] = relay->getTotalVoltageMillivolts();
+  doc["ma"] = relay->getCurrentMilliamps();
+  doc["maxma"] = relay->getMaxCurrentMilliamps();
+  doc["soc"] = relay->getOverriddenSOC();
+  doc["bmssoc"] = relay->getBmsReportedSOC();
+  doc["vsoc"] = relay->getBatteryFuelGauge().getVoltageBasedSoc();
+  doc["usedmah"] = relay->getUsedChargeMah();
+  doc["regenmah"] = relay->getRegeneratedChargeMah();
+  JsonArray c = doc.createNestedArray("cells");
+  for (int i = 0; i < 15; i++) {
+    c.add(cells[i]);
+  }
+  JsonArray t = doc.createNestedArray("temps");
+  for (int i = 0; i < 5; i++) {
+    t.add(temps[i]);  // 255 = sensor invalid; index 4 is the BMS board
+  }
+  String out;
+  serializeJson(doc, out);
+  return out;
+}
+
 bool lockingPreconditionsMet() {
   return strlen(Settings->ap_self_password) > 0;
 }
@@ -409,6 +436,10 @@ void setupWebServer(BmsRelay *bmsRelay) {
     request->send(200, "application/json", generateOwieStatusJson());
   });
 
+  webServer.on("/live", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(200, "application/json", generateLiveJson());
+  });
+
   webServer.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send_P(200, "text/html", INDEX_HTML_PROGMEM_ARRAY, INDEX_HTML_SIZE,
                     templateProcessor);
@@ -474,12 +505,9 @@ void setupWebServer(BmsRelay *bmsRelay) {
                     MONITOR_HTML_SIZE, templateProcessor);
   });
   webServer.on("/stockmode", HTTP_GET, [](AsyncWebServerRequest *request) {
-    // Two characters: stock regen/range estimator, then Future Motion SOC.
     const bool regen =
         Settings->pass_through_current && Settings->pass_through_status;
-    String state = regen ? "1" : "0";
-    state.concat(Settings->pass_through_soc ? "1" : "0");
-    request->send(200, "text/plain", state);
+    request->send(200, "text/plain", regen ? "1" : "0");
   });
   webServer.on("/settings", HTTP_ANY, [](AsyncWebServerRequest *request) {
     switch (request->method()) {
@@ -527,8 +555,9 @@ void setupWebServer(BmsRelay *bmsRelay) {
             request->getParam("stock_regen", true) != nullptr;
         Settings->pass_through_current = stockRegen;
         Settings->pass_through_status = stockRegen;
-        Settings->pass_through_soc =
-            request->getParam("stock_soc", true) != nullptr;
+        // Owie's own battery percentage is always used; the old "stock
+        // battery percentage" option was removed.
+        Settings->pass_through_soc = false;
         snprintf(Settings->ap_self_password, sizeof(Settings->ap_self_password),
                  "%s", apSelfPassword->value().c_str());
         snprintf(Settings->ap_self_name, sizeof(Settings->ap_self_name), "%s",
