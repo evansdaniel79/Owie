@@ -140,6 +140,24 @@ void testCurrentParsing() {
   TEST_ASSERT_EQUAL(-1320, relay->getCurrentMilliamps());
 }
 
+void testMaxCurrentTracksPeakDischargeOnly() {
+  TEST_ASSERT_EQUAL(0, relay->getMaxCurrentMilliamps());
+  // Regen (-1320 mA) must not raise or lower the maximum.
+  addMockData({0xff, 0x55, 0xaa, 0x5, 0xff, 0xe8, 0x3, 0xea, 0xFF, 0x55, 0xAA});
+  relay->loop();
+  TEST_ASSERT_EQUAL(0, relay->getMaxCurrentMilliamps());
+  // +24 counts = +1320 mA discharge.
+  // (The previous frame's trailing FF 55 AA is already this frame's preamble.)
+  addMockData({0x5, 0x00, 0x18, 0x02, 0x1b, 0xFF, 0x55, 0xAA});
+  relay->loop();
+  TEST_ASSERT_EQUAL(1320, relay->getMaxCurrentMilliamps());
+  // A lower reading afterwards keeps the peak.
+  addMockData({0x5, 0xff, 0xe8, 0x3, 0xea, 0xFF, 0x55, 0xAA});
+  relay->loop();
+  TEST_ASSERT_EQUAL(1320, relay->getMaxCurrentMilliamps());
+  TEST_ASSERT_EQUAL(-1320, relay->getCurrentMilliamps());
+}
+
 void testCellVoltageParsing() {
   addMockData({0xff, 0x55, 0xaa, 0x02, 0x0f, 0x14, 0x0f, 0x14, 0x0f, 0x14, 0x0f,
                0x13, 0x0f, 0x14, 0x0f, 0x14, 0x0f, 0x14, 0x0f, 0x13, 0x0f, 0x14,
@@ -457,6 +475,7 @@ int main(int argc, char** argv) {
   RUN_TEST(testPacketCallback);
   RUN_TEST(testBatterySocParsing);
   RUN_TEST(testCurrentParsing);
+  RUN_TEST(testMaxCurrentTracksPeakDischargeOnly);
   RUN_TEST(testCellVoltageParsing);
   RUN_TEST(testTemperatureParsing);
   RUN_TEST(testTemperatureParsingInvalidSensorAndHighValues);
