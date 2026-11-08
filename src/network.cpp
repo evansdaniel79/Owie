@@ -228,6 +228,13 @@ String templateProcessor(const String &var) {
   } else if (var == "CURRENT_AMPS") {
     return String(relay->getCurrentMilliamps() / 1000.0,
                   /* decimalPlaces = */ 1);
+  } else if (var == "LEARN_STATUS") {
+    const auto &gauge = relay->getBatteryFuelGauge();
+    if (gauge.isLearned()) {
+      return "Learned";
+    }
+    return "Learning (" + String(gauge.getLearningProgressPercent()) +
+           "&#37;)";
   } else if (var == "PACK_NAME") {
     if (!battery_pack::isConfigured(
             Settings->pack_cell_type, Settings->pack_series,
@@ -517,7 +524,13 @@ void setupWebServer(BmsRelay *bmsRelay) {
                         BATTERY_HTML_SIZE, templateProcessor);
         return;
       case HTTP_POST:
-        if (request->getParam("reset_stats", true) != nullptr) {
+        if (request->getParam("relearn", true) != nullptr) {
+          // Forget everything learned about this battery, in memory and in the
+          // copy saved in flash, and start learning again.
+          relay->getBatteryFuelGauge().reset();
+          Settings->battery_state = BatteryStateMsg_init_default;
+          saveSettings();
+        } else if (request->getParam("reset_stats", true) != nullptr) {
           relay->getBatteryFuelGauge().reset();
         } else if (request->getParam("reset_settings", true) != nullptr) {
           Settings->battery_state = BatteryStateMsg_init_default;

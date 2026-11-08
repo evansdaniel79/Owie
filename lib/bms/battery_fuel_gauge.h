@@ -52,6 +52,23 @@ class BatteryFuelGauge {
                      window);
   }
 
+  // How much of the pack's range Owie has learned so far, 0-100: the width of
+  // the tracked range relative to LEARNED_WINDOW_SOC points. 100 means
+  // "learned" (the gauge has seen a wide enough span to calibrate itself).
+  static constexpr int32_t LEARNED_WINDOW_SOC = 60;
+  int32_t getLearningProgressPercent() const {
+    if (state_.bottomMilliampSeconds <= 0) {
+      return 0;
+    }
+    const int32_t window = state_.topSoc - state_.bottomSoc;
+    if (window <= 0) {
+      return 0;
+    }
+    return window >= LEARNED_WINDOW_SOC ? 100
+                                        : window * 100 / LEARNED_WINDOW_SOC;
+  }
+  bool isLearned() const { return getLearningProgressPercent() >= 100; }
+
   int32_t getMilliampSecondsDischarged() {
     return milliamp_seconds_discharged_;
   }

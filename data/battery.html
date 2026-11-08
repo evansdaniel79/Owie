@@ -23,6 +23,10 @@
             <h2 class="section-title">Battery</h2>
             <table>
                 <tr>
+                    <th>Battery learning</th>
+                    <td>%LEARN_STATUS%</td>
+                </tr>
+                <tr>
                     <th>SOC</th>
                     <td>%OVERRIDDEN_SOC%%%</td>
                 </tr>
@@ -143,18 +147,14 @@
         </div>
 
         <div class="btn-row">
-            <form method="post">
-                <input type="hidden" name="reset_stats">
-                <button>Reset battery tracking</button>
-            </form>
-            <form method="post">
-                <input type="hidden" name="reset_settings">
-                <button class="btn-secondary">Clear saved battery data</button>
+            <form method="post" onsubmit="return confirm('Forget what Owie has learned about this battery and start learning again?');">
+                <input type="hidden" name="relearn">
+                <button>Relearn battery</button>
             </form>
             <button class="btn-secondary" onclick="history.back()">Back</button>
         </div>
 
-        <p class="field-hint">Reset battery tracking restarts Owie's Ah-tracked charge estimate from now. Clear saved battery data erases the copy kept in flash that is loaded at next boot. Neither touches your WiFi or other settings.</p>
+        <p class="field-hint">Battery learning shows whether Owie has seen enough of your pack's range to calibrate its percentage. Relearn battery forgets all of it and starts over, for example after changing the battery. It does not touch your WiFi or other settings.</p>
     </main>
     <script>
         (function () {

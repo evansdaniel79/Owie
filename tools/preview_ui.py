@@ -23,7 +23,7 @@ VALS = {
     "BMS_BALANCING": "none", "BMS_CYCLES": "12", "BMS_HEALTH": "98%",
     "RECEIVED_SERIAL_DEC": "1234567", "RECEIVED_SERIAL_HEX": "0x12D687",
     "SENT_SERIAL_DEC": "4289449455", "SENT_SERIAL_HEX": "0xFFABCDEF",
-    "PACK_NAME": "15S2P Samsung 30Q", "PACK_RATED_MAH": "6000 mAh", "PACK_RATED_WH": "324 Wh", "PACK_LEARNED_MAH": "5410 mAh", "PACK_HEALTH": "90%",
+    "LEARN_STATUS": "Learning (45&#37;)", "PACK_NAME": "15S2P Samsung 30Q", "PACK_RATED_MAH": "6000 mAh", "PACK_RATED_WH": "324 Wh", "PACK_LEARNED_MAH": "5410 mAh", "PACK_HEALTH": "90%",
     "SSID": "Owie-1234", "PASS": "", "UPDATE_ERROR": "example error",
 }
 PAGES = {"/": "index", "/settings": "settings", "/battery": "battery", "/monitor": "monitor",

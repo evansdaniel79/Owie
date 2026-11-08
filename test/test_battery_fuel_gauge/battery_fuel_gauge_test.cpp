@@ -14,6 +14,23 @@ void testUninitializedGauge() {
   TEST_ASSERT_EQUAL(0, gauge->getMilliampSecondsRecharged());
 }
 
+void testLearningProgress() {
+  TEST_ASSERT_EQUAL(0, gauge->getLearningProgressPercent());
+  TEST_ASSERT_FALSE(gauge->isLearned());
+  FuelGaugeState state;
+  state.bottomMilliampSeconds = 3600 * 1000;
+  state.topSoc = 100;
+  state.bottomSoc = 70;  // 30 of 60 points
+  gauge->restoreState(state);
+  TEST_ASSERT_EQUAL(50, gauge->getLearningProgressPercent());
+  TEST_ASSERT_FALSE(gauge->isLearned());
+  state.bottomSoc = 30;  // 70 points, past the threshold
+  gauge = std::make_unique<BatteryFuelGauge>();
+  gauge->restoreState(state);
+  TEST_ASSERT_EQUAL(100, gauge->getLearningProgressPercent());
+  TEST_ASSERT_TRUE(gauge->isLearned());
+}
+
 void testEstimatedCapacity() {
   TEST_ASSERT_EQUAL(-1, gauge->getEstimatedCapacityMah());
   FuelGaugeState state;
@@ -93,6 +110,7 @@ void testSimpleChargeAndHalfwayDischarge() {
 int main(int argc, char** argv) {
   UNITY_BEGIN();
   RUN_TEST(testUninitializedGauge);
+  RUN_TEST(testLearningProgress);
   RUN_TEST(testEstimatedCapacity);
   RUN_TEST(testCurrentRideSpentAndRegeneratedStats);
   RUN_TEST(testSocAfterFirstVoltageMessageAndStateSaving);
