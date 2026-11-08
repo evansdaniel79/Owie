@@ -14,6 +14,24 @@ void testUninitializedGauge() {
   TEST_ASSERT_EQUAL(0, gauge->getMilliampSecondsRecharged());
 }
 
+void testEstimatedCapacity() {
+  TEST_ASSERT_EQUAL(-1, gauge->getEstimatedCapacityMah());
+  FuelGaugeState state;
+  // 3600 mAh drawn while the tracked range covers 100% -> 40% (60 points):
+  // implies 6000 mAh.
+  state.bottomMilliampSeconds = 3600 * 3600;
+  state.currentMilliampSeconds = 0;
+  state.topSoc = 100;
+  state.bottomSoc = 40;
+  gauge->restoreState(state);
+  TEST_ASSERT_EQUAL(6000, gauge->getEstimatedCapacityMah());
+  // A range narrower than 40 points is not trusted.
+  state.bottomSoc = 70;
+  gauge = std::make_unique<BatteryFuelGauge>();
+  gauge->restoreState(state);
+  TEST_ASSERT_EQUAL(-1, gauge->getEstimatedCapacityMah());
+}
+
 void testCurrentRideSpentAndRegeneratedStats() {
   gauge->updateCurrent(6666, 0);  // The first current is disregarded
   gauge->updateCurrent(1000, 123);
@@ -75,6 +93,7 @@ void testSimpleChargeAndHalfwayDischarge() {
 int main(int argc, char** argv) {
   UNITY_BEGIN();
   RUN_TEST(testUninitializedGauge);
+  RUN_TEST(testEstimatedCapacity);
   RUN_TEST(testCurrentRideSpentAndRegeneratedStats);
   RUN_TEST(testSocAfterFirstVoltageMessageAndStateSaving);
   RUN_TEST(testSimpleChargeAndHalfwayDischarge);

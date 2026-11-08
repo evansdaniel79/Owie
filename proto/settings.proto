@@ -25,5 +25,13 @@ message SettingsMsg {
   bool pass_through_current = 14;  // current: regen percent + range (packet 5)
   bool pass_through_status = 15;   // status flags (packet 0)
 
+  // Battery pack description (0 / unset = not configured). Used for the rated
+  // capacity and battery health figures only; never changes what Owie sends to
+  // the board.
+  uint32 pack_cell_type = 16;     // see lib/bms/battery_pack.h
+  uint32 pack_series = 17;        // cells in series (S)
+  uint32 pack_parallel = 18;      // cells in parallel (P)
+  uint32 pack_custom_cell_mah = 19;  // only for the custom cell type
+
   reserved 5,11;
 }

@@ -38,6 +38,20 @@ class BatteryFuelGauge {
   int32_t getSoc() const;
   int32_t getVoltageBasedSoc() const { return voltage_based_soc_; }
 
+  // Pack capacity in mAh implied by the tracked range: the charge drawn across
+  // the range divided by the share of the pack that range covers. -1 until the
+  // range spans at least MIN_CAPACITY_WINDOW_SOC points; narrower ranges are
+  // too noisy to mean anything. Works for any pack, set up in Settings or not.
+  static constexpr int32_t MIN_CAPACITY_WINDOW_SOC = 40;
+  int32_t getEstimatedCapacityMah() const {
+    const int32_t window = state_.topSoc - state_.bottomSoc;
+    if (window < MIN_CAPACITY_WINDOW_SOC || state_.bottomMilliampSeconds <= 0) {
+      return -1;
+    }
+    return (int32_t)((int64_t)state_.bottomMilliampSeconds / 3600 * 100 /
+                     window);
+  }
+
   int32_t getMilliampSecondsDischarged() {
     return milliamp_seconds_discharged_;
   }

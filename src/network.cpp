@@ -4,10 +4,12 @@
 #include <ESP8266WiFi.h>
 #include <ESPAsyncWebServer.h>
 
+#include <algorithm>
 #include <functional>
 
 #include "ArduinoJson.h"
 #include "async_ota.h"
+#include "battery_pack.h"
 #include "bms_relay.h"
 #include "data.h"
 #include "settings.h"
@@ -226,6 +228,44 @@ String templateProcessor(const String &var) {
   } else if (var == "CURRENT_AMPS") {
     return String(relay->getCurrentMilliamps() / 1000.0,
                   /* decimalPlaces = */ 1);
+  } else if (var == "PACK_NAME") {
+    if (!battery_pack::isConfigured(
+            Settings->pack_cell_type, Settings->pack_series,
+            Settings->pack_parallel, Settings->pack_custom_cell_mah)) {
+      return "Not set up (Settings > Battery Pack)";
+    }
+    String s(Settings->pack_series);
+    s.concat("S");
+    s.concat(Settings->pack_parallel);
+    s.concat("P ");
+    s.concat(battery_pack::cellName(Settings->pack_cell_type));
+    return s;
+  } else if (var == "PACK_RATED_MAH") {
+    const uint32_t mah = battery_pack::ratedMah(
+        Settings->pack_cell_type, Settings->pack_series,
+        Settings->pack_parallel, Settings->pack_custom_cell_mah);
+    return mah == 0 ? String("n/a") : String(mah) + " mAh";
+  } else if (var == "PACK_RATED_WH") {
+    const uint32_t wh = battery_pack::ratedWh(
+        Settings->pack_cell_type, Settings->pack_series,
+        Settings->pack_parallel, Settings->pack_custom_cell_mah);
+    return wh == 0 ? String("n/a") : String(wh) + " Wh";
+  } else if (var == "PACK_LEARNED_MAH") {
+    const int32_t mah = relay->getBatteryFuelGauge().getEstimatedCapacityMah();
+    return mah < 0 ? String("Learning (needs a ride covering about half the pack)")
+                   : String(mah) + " mAh";
+  } else if (var == "PACK_HEALTH") {
+    const uint32_t rated = battery_pack::ratedMah(
+        Settings->pack_cell_type, Settings->pack_series,
+        Settings->pack_parallel, Settings->pack_custom_cell_mah);
+    const int32_t learned =
+        relay->getBatteryFuelGauge().getEstimatedCapacityMah();
+    if (rated == 0 || learned < 0) {
+      return "n/a";
+    }
+    // Capped at 100: estimates above the rating are measurement noise.
+    const uint32_t pct = std::min<uint32_t>(100, learned * 100UL / rated);
+    return String(pct) + "&#37;";
   } else if (var == "MAX_CURRENT_AMPS") {
     return String(relay->getMaxCurrentMilliamps() / 1000.0,
                   /* decimalPlaces = */ 1);
@@ -436,6 +476,19 @@ void setupWebServer(BmsRelay *bmsRelay) {
     request->send(200, "application/json", generateOwieStatusJson());
   });
 
+  webServer.on("/pack", HTTP_GET, [](AsyncWebServerRequest *request) {
+    String out = "{\"cell\":";
+    out.concat(Settings->pack_cell_type);
+    out.concat(",\"s\":");
+    out.concat(Settings->pack_series);
+    out.concat(",\"p\":");
+    out.concat(Settings->pack_parallel);
+    out.concat(",\"mah\":");
+    out.concat(Settings->pack_custom_cell_mah);
+    out.concat("}");
+    request->send(200, "application/json", out);
+  });
+
   webServer.on("/live", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send(200, "application/json", generateLiveJson());
   });
@@ -548,6 +601,29 @@ void setupWebServer(BmsRelay *bmsRelay) {
               "Wifi Power range MUST be between 8 (dBm) and 17 (dBm).");
           return;
         }
+        // Battery pack description (optional; all four fields travel together).
+        const auto packCell = request->getParam("pack_cell", true);
+        const auto packS = request->getParam("pack_s", true);
+        const auto packP = request->getParam("pack_p", true);
+        const auto packMah = request->getParam("pack_mah", true);
+        const uint32_t cellType =
+            packCell == nullptr ? 0 : packCell->value().toInt();
+        const uint32_t series = packS == nullptr ? 0 : packS->value().toInt();
+        const uint32_t parallel = packP == nullptr ? 0 : packP->value().toInt();
+        const uint32_t customMah =
+            packMah == nullptr ? 0 : packMah->value().toInt();
+        if (!battery_pack::validSettings(cellType, series, parallel,
+                                         customMah)) {
+          request->send(400, "text/html",
+                        "Battery pack: series must be 1-30, parallel 1-20 and "
+                        "a custom cell 500-10000 mAh.");
+          return;
+        }
+        Settings->pack_cell_type = cellType;
+        Settings->pack_series = cellType == 0 ? 0 : series;
+        Settings->pack_parallel = cellType == 0 ? 0 : parallel;
+        Settings->pack_custom_cell_mah =
+            cellType == battery_pack::CELL_CUSTOM ? customMah : 0;
         Settings->wifi_power = wifiPower->value().toInt();
         // Unchecked checkboxes aren't sent in the form post, so a missing
         // param means "off".
