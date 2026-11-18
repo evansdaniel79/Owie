@@ -25,5 +25,8 @@ message SettingsMsg {
   bool pass_through_current = 14;  // current: regen percent + range (packet 5)
   bool pass_through_status = 15;   // status flags (packet 0)
 
+  // WiFi channel of the Owie network (1-11); 0 = default (channel 1).
+  uint32 wifi_channel = 20;
+
   reserved 5,11,16,17,18,19;
 }

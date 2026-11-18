@@ -385,7 +385,13 @@ void setupWifi() {
   } else {
     snprintf(apName, sizeof(apName), "Owie-%04X", ESP.getChipId() & 0xFFFF);
   }
-  WiFi.softAP(apName, Settings->ap_self_password);
+  // The channel only applies while Owie is not joined to a home WiFi network
+  // (then the radio follows the router's channel).
+  const uint8_t channel =
+      (Settings->wifi_channel >= 1 && Settings->wifi_channel <= 11)
+          ? Settings->wifi_channel
+          : 1;
+  WiFi.softAP(apName, Settings->ap_self_password, channel);
   if (stationMode) {
     WiFi.begin(Settings->ap_name, Settings->ap_password);
     WiFi.hostname(apName);
@@ -479,6 +485,70 @@ void setupWebServer(BmsRelay *bmsRelay) {
     state.concat(Settings->pass_through_soc ? "1" : "0");
     request->send(200, "text/plain", state);
   });
+  webServer.on("/wifichannel", HTTP_GET, [](AsyncWebServerRequest *request) {
+    const uint32_t c = Settings->wifi_channel;
+    request->send(200, "text/plain", String(c >= 1 && c <= 11 ? c : 1));
+  });
+  // Looks at nearby WiFi networks and suggests the least crowded channel. Only
+  // runs when asked (never at boot). The scan briefly hops channels, so the
+  // phone's connection to Owie may blip for a couple of seconds.
+  webServer.on("/wifiscan", HTTP_GET, [](AsyncWebServerRequest *request) {
+    const bool stationMode = strlen(Settings->ap_name) > 0;
+    const int state = WiFi.scanComplete();
+    if (request->hasParam("start")) {
+      if (state != WIFI_SCAN_RUNNING) {
+        WiFi.scanDelete();
+        if (!stationMode) {
+          WiFi.mode(WIFI_AP_STA);  // scanning needs the station interface
+        }
+        WiFi.scanNetworks(/* async = */ true, /* show_hidden = */ true);
+      }
+      request->send(200, "application/json", "{\"state\":\"scanning\"}");
+      return;
+    }
+    if (state == WIFI_SCAN_RUNNING) {
+      request->send(200, "application/json", "{\"state\":\"scanning\"}");
+      return;
+    }
+    if (state < 0) {
+      request->send(200, "application/json", "{\"state\":\"idle\"}");
+      return;
+    }
+    // Score each channel 1-11: every network adds weight to the channels it
+    // overlaps (same channel 5, one away 4, ... four away 1), doubled when it
+    // is strong. Lower is better; channels 1, 6 and 11 win ties because they
+    // do not overlap each other.
+    int score[12] = {0};
+    for (int i = 0; i < state; i++) {
+      const int ch = WiFi.channel(i);
+      const int strong = WiFi.RSSI(i) > -70 ? 2 : 1;
+      for (int c = 1; c <= 11; c++) {
+        const int d = abs(c - ch);
+        if (d < 5) {
+          score[c] += (5 - d) * strong;
+        }
+      }
+    }
+    int best = 1;
+    int bestScore = 1 << 30;
+    for (int c = 1; c <= 11; c++) {
+      const int s = score[c] * 2 + ((c == 1 || c == 6 || c == 11) ? 0 : 1);
+      if (s < bestScore) {
+        bestScore = s;
+        best = c;
+      }
+    }
+    String out = "{\"state\":\"done\",\"best\":";
+    out.concat(best);
+    out.concat(",\"networks\":");
+    out.concat(state);
+    out.concat("}");
+    WiFi.scanDelete();
+    if (!stationMode) {
+      WiFi.mode(WIFI_AP);
+    }
+    request->send(200, "application/json", out);
+  });
   webServer.on("/settings", HTTP_ANY, [](AsyncWebServerRequest *request) {
     switch (request->method()) {
       case HTTP_GET:
@@ -517,6 +587,16 @@ void setupWebServer(BmsRelay *bmsRelay) {
               400, "text/html",
               "Wifi Power range MUST be between 8 (dBm) and 17 (dBm).");
           return;
+        }
+        const auto wifiChannel = request->getParam("wifichannel", true);
+        if (wifiChannel != nullptr &&
+            (wifiChannel->value().toInt() < 1 ||
+             wifiChannel->value().toInt() > 11)) {
+          request->send(400, "text/html", "WiFi channel must be 1-11.");
+          return;
+        }
+        if (wifiChannel != nullptr) {
+          Settings->wifi_channel = wifiChannel->value().toInt();
         }
         Settings->wifi_power = wifiPower->value().toInt();
         // Unchecked checkboxes aren't sent in the form post, so a missing

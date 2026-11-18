@@ -43,6 +43,8 @@ class H(http.server.BaseHTTPRequestHandler):
         if p in PAGES: return self.send(render(PAGES[p]))
         if p == "/styles.css": return self.send(open(os.path.join(DATA, "styles.css")).read(), "text/css")
         if p == "/autoupdate": return self.send(json.dumps({k: VALS[k] for k in VALS if k.isupper() or k == "OWIE_version"}), "application/json")
+        if p == "/wifichannel": return self.send("1", "text/plain")
+        if p == "/wifiscan": return self.send(json.dumps({"state": "done", "best": 6, "networks": 9}), "application/json")
         if p == "/stockmode": return self.send("00", "text/plain")
         if p == "/lock": return self.send("1" if "toggleArm" in self.path else "ok", "text/plain")
         self.send_response(404); self.end_headers()
