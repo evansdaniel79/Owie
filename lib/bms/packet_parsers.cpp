@@ -211,4 +211,3 @@ void BmsRelay::bmsStatusParser(Packet& p) {
                      isBatteryTempOutOfRange() || isBatteryOvercharged());
   battery_fuel_gauge_.updateChargingStatus(isCharging());
 }
-}
