@@ -15,6 +15,7 @@ void testUninitializedGauge() {
 }
 
 void testCurrentRideSpentAndRegeneratedStats() {
+  gauge->updateVoltage(3800, 0);  // current is ignored until a voltage is seen
   gauge->updateCurrent(6666, 0);  // The first current is disregarded
   gauge->updateCurrent(1000, 123);
   TEST_ASSERT_EQUAL(0, gauge->getMilliampSecondsRecharged());
@@ -61,10 +62,11 @@ void testSimpleChargeAndHalfwayDischarge() {
   TEST_ASSERT_EQUAL(68, gauge->getSoc());
 
   for (int32_t time = 0; time <= 10 * 60 * 1000; time += 100) {
-    gauge->updateCurrent(6000, time);
     // Note that we're updating voltage with a value that is off.
     // The fuel gauge must correctly go based solely off Ah calculations.
+    // (Voltage goes first: current is ignored until a voltage has been seen.)
     gauge->updateVoltage(3908, time);
+    gauge->updateCurrent(6000, time);
   }
   state = gauge->getState();
   TEST_ASSERT_EQUAL(43, gauge->getSoc());
