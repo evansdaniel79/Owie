@@ -307,56 +307,6 @@ void testPacketReplay() {
                  0x06, 0x02, 0x0c});
 }
 
-void testStatusSocBucketFollowsOverriddenSoc() {
-  // Cell voltages (min 3859 mV -> voltage based SOC 61 %), then the BMS's
-  // own 43 % in message 0x3, then a status byte with bucket 11 (<= 20 %),
-  // charging and "hot" bits set.
-  addMockData({0xff, 0x55, 0xaa, 0x02, 0x0f, 0x14, 0x0f, 0x14, 0x0f, 0x14, 0x0f,
-               0x13, 0x0f, 0x14, 0x0f, 0x14, 0x0f, 0x14, 0x0f, 0x13, 0x0f, 0x14,
-               0x0f, 0x13, 0x0f, 0x13, 0x0f, 0x13, 0x0f, 0x13, 0x0f, 0x14, 0x0f,
-               0x14, 0x00, 0x2a, 0x04, 0x31});
-  addMockData({0xFF, 0x55, 0xAA, 0x03, 0x2B, 0x02, 0x2C});
-  addMockData({0xff, 0x55, 0xaa, 0x00, 0xE1, 0x02, 0xDF});
-  relay->loop();
-  TEST_ASSERT_EQUAL(61, relay->getOverriddenSOC());
-  // The BMS's view of the status byte is kept for the flag getters.
-  TEST_ASSERT_TRUE(relay->isCharging());
-  TEST_ASSERT_TRUE(relay->isBatteryTempOutOfRange());
-  // Forwarded: cells unchanged, SOC rewritten to 61 (0x3D), status bucket
-  // rewritten from 11 to 01 (50..80 %) with the other bits intact.
-  expectDataOut({0xff, 0x55, 0xaa, 0x02, 0x0f, 0x14, 0x0f, 0x14, 0x0f, 0x14, 0x0f,
-                 0x13, 0x0f, 0x14, 0x0f, 0x14, 0x0f, 0x14, 0x0f, 0x13, 0x0f, 0x14,
-                 0x0f, 0x13, 0x0f, 0x13, 0x0f, 0x13, 0x0f, 0x13, 0x0f, 0x14, 0x0f,
-                 0x14, 0x00, 0x2a, 0x04, 0x31,
-                 0xFF, 0x55, 0xAA, 0x03, 0x3D, 0x02, 0x3E,
-                 0xff, 0x55, 0xaa, 0x00, 0x61, 0x02, 0x5F});
-}
-
-void testStockModeLeavesStatusSocBucketAlone() {
-  // Same traffic as testStatusSocBucketFollowsOverriddenSoc, but with stock
-  // battery mode on: nothing may be rewritten, the board sees exactly what the
-  // BMS sent (SOC 43 % = 0x2B, status byte 0xE1 with bucket 11 untouched).
-  relay->setPassThroughSoc(true);
-  relay->setPassThroughStatus(true);
-  const std::vector<uint8_t> cells = {
-      0xff, 0x55, 0xaa, 0x02, 0x0f, 0x14, 0x0f, 0x14, 0x0f, 0x14, 0x0f,
-      0x13, 0x0f, 0x14, 0x0f, 0x14, 0x0f, 0x14, 0x0f, 0x13, 0x0f, 0x14,
-      0x0f, 0x13, 0x0f, 0x13, 0x0f, 0x13, 0x0f, 0x13, 0x0f, 0x14, 0x0f,
-      0x14, 0x00, 0x2a, 0x04, 0x31};
-  const std::vector<uint8_t> soc = {0xFF, 0x55, 0xAA, 0x03, 0x2B, 0x02, 0x2C};
-  const std::vector<uint8_t> status = {0xff, 0x55, 0xaa, 0x00,
-                                       0xE1, 0x02, 0xDF};
-  addMockData(cells);
-  addMockData(soc);
-  addMockData(status);
-  relay->loop();
-  std::vector<uint8_t> expected;
-  expected.insert(expected.end(), cells.begin(), cells.end());
-  expected.insert(expected.end(), soc.begin(), soc.end());
-  expected.insert(expected.end(), status.begin(), status.end());
-  expectDataOut(expected);
-}
-
 void testBmsInfoParsing() {
   TEST_ASSERT_FALSE(relay->hasCycleInfo());
   TEST_ASSERT_EQUAL(0, relay->getBmsFirmwareVersion());
@@ -486,8 +436,6 @@ int main(int argc, char** argv) {
   RUN_TEST(testPassThroughStatusForwardsStatusPacket);
   RUN_TEST(testPassThroughFlagsAreIndependent);
   RUN_TEST(testPacketReplay);
-  RUN_TEST(testStatusSocBucketFollowsOverriddenSoc);
-  RUN_TEST(testStockModeLeavesStatusSocBucketAlone);
   RUN_TEST(testBmsInfoParsing);
   RUN_TEST(testShutdownWarningParsedAndNeverReplayed);
   RUN_TEST(testShutdownCodeTriggersCallbackOnce);

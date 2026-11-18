@@ -23,7 +23,6 @@ VALS = {
     "BMS_BALANCING": "none", "BMS_CYCLES": "12", "BMS_HEALTH": "98%",
     "RECEIVED_SERIAL_DEC": "1234567", "RECEIVED_SERIAL_HEX": "0x12D687",
     "SENT_SERIAL_DEC": "4289449455", "SENT_SERIAL_HEX": "0xFFABCDEF",
-    "RIDELOG_STATUS": "Recording automatically: 34 min stored (keeps the latest 80 min).", "LEARN_STATUS": "Learning (45&#37;)", "PACK_NAME": "15S2P Samsung 30Q", "PACK_RATED_MAH": "6000 mAh", "PACK_RATED_WH": "324 Wh", "PACK_LEARNED_MAH": "5410 mAh", "PACK_HEALTH": "90%",
     "SSID": "Owie-1234", "PASS": "", "UPDATE_ERROR": "example error",
 }
 PAGES = {"/": "index", "/settings": "settings", "/battery": "battery", "/monitor": "monitor",
@@ -44,9 +43,7 @@ class H(http.server.BaseHTTPRequestHandler):
         if p in PAGES: return self.send(render(PAGES[p]))
         if p == "/styles.css": return self.send(open(os.path.join(DATA, "styles.css")).read(), "text/css")
         if p == "/autoupdate": return self.send(json.dumps({k: VALS[k] for k in VALS if k.isupper() or k == "OWIE_version"}), "application/json")
-        if p == "/pack": return self.send(json.dumps({"cell": 1, "s": 15, "p": 2, "mah": 0}), "application/json")
-        if p == "/ridelog.csv": return self.send("t_s,mv,ma_avg,ma_peak,min_cell_mv,max_cell_mv,soc,bms_soc,voltage_soc,temp_max_c\n5,58840,1200,3000,3920,3935,68,71,69,25\n", "text/csv")
-        if p == "/stockmode": return self.send("0", "text/plain")
+        if p == "/stockmode": return self.send("00", "text/plain")
         if p == "/lock": return self.send("1" if "toggleArm" in self.path else "ok", "text/plain")
         self.send_response(404); self.end_headers()
     def do_POST(self):

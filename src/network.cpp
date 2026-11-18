@@ -9,14 +9,10 @@
 
 #include "ArduinoJson.h"
 #include "async_ota.h"
-#include "battery_pack.h"
 #include "bms_relay.h"
 #include "data.h"
-#include "ride_logger.h"
 #include "settings.h"
 #include "task_queue.h"
-
-extern RideLogger rideLogger;  // defined in bms_main.cpp
 
 namespace {
 DNSServer dnsServer;
@@ -204,60 +200,6 @@ String templateProcessor(const String &var) {
   } else if (var == "CURRENT_AMPS") {
     return String(relay->getCurrentMilliamps() / 1000.0,
                   /* decimalPlaces = */ 1);
-  } else if (var == "RIDELOG_STATUS") {
-    if (!rideLogger.active()) {
-      return "Not available (not enough free memory on the board).";
-    }
-    const unsigned minutes = rideLogger.size() * RideLogger::INTERVAL_MS / 60000;
-    const unsigned keepMinutes =
-        rideLogger.capacity() * RideLogger::INTERVAL_MS / 60000;
-    return "Recording automatically: " + String(minutes) +
-           " min stored (keeps the latest " + String(keepMinutes) + " min).";
-  } else if (var == "LEARN_STATUS") {
-    const auto &gauge = relay->getBatteryFuelGauge();
-    if (gauge.isLearned()) {
-      return "Learned";
-    }
-    return "Learning (" + String(gauge.getLearningProgressPercent()) +
-           "&#37;)";
-  } else if (var == "PACK_NAME") {
-    if (!battery_pack::isConfigured(
-            Settings->pack_cell_type, Settings->pack_series,
-            Settings->pack_parallel, Settings->pack_custom_cell_mah)) {
-      return "Not set up (Settings > Battery Pack)";
-    }
-    String s(Settings->pack_series);
-    s.concat("S");
-    s.concat(Settings->pack_parallel);
-    s.concat("P ");
-    s.concat(battery_pack::cellName(Settings->pack_cell_type));
-    return s;
-  } else if (var == "PACK_RATED_MAH") {
-    const uint32_t mah = battery_pack::ratedMah(
-        Settings->pack_cell_type, Settings->pack_series,
-        Settings->pack_parallel, Settings->pack_custom_cell_mah);
-    return mah == 0 ? String("n/a") : String(mah) + " mAh";
-  } else if (var == "PACK_RATED_WH") {
-    const uint32_t wh = battery_pack::ratedWh(
-        Settings->pack_cell_type, Settings->pack_series,
-        Settings->pack_parallel, Settings->pack_custom_cell_mah);
-    return wh == 0 ? String("n/a") : String(wh) + " Wh";
-  } else if (var == "PACK_LEARNED_MAH") {
-    const int32_t mah = relay->getBatteryFuelGauge().getEstimatedCapacityMah();
-    return mah < 0 ? String("Learning (needs a ride covering about half the pack)")
-                   : String(mah) + " mAh";
-  } else if (var == "PACK_HEALTH") {
-    const uint32_t rated = battery_pack::ratedMah(
-        Settings->pack_cell_type, Settings->pack_series,
-        Settings->pack_parallel, Settings->pack_custom_cell_mah);
-    const int32_t learned =
-        relay->getBatteryFuelGauge().getEstimatedCapacityMah();
-    if (rated == 0 || learned < 0) {
-      return "n/a";
-    }
-    // Capped at 100: estimates above the rating are measurement noise.
-    const uint32_t pct = std::min<uint32_t>(100, learned * 100UL / rated);
-    return String(pct) + "&#37;";
   } else if (var == "MAX_CURRENT_AMPS") {
     return String(relay->getMaxCurrentMilliamps() / 1000.0,
                   /* decimalPlaces = */ 1);
@@ -468,60 +410,6 @@ void setupWebServer(BmsRelay *bmsRelay) {
     request->send(200, "application/json", generateOwieStatusJson());
   });
 
-  webServer.on("/pack", HTTP_GET, [](AsyncWebServerRequest *request) {
-    String out = "{\"cell\":";
-    out.concat(Settings->pack_cell_type);
-    out.concat(",\"s\":");
-    out.concat(Settings->pack_series);
-    out.concat(",\"p\":");
-    out.concat(Settings->pack_parallel);
-    out.concat(",\"mah\":");
-    out.concat(Settings->pack_custom_cell_mah);
-    out.concat("}");
-    request->send(200, "application/json", out);
-  });
-
-  webServer.on("/ridelog.csv", HTTP_GET, [](AsyncWebServerRequest *request) {
-    AsyncWebServerResponse *response = request->beginChunkedResponse(
-        "text/csv",
-        [](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
-          // Rows are produced on the fly; `index` is the byte offset, so a
-          // fresh download (index 0) restarts the state. One download at a
-          // time is expected.
-          static size_t nextRow;
-          static bool headerSent;
-          static String pending;
-          if (index == 0) {
-            nextRow = 0;
-            headerSent = false;
-            pending = "";
-          }
-          if (!headerSent) {
-            pending = "t_s,mv,ma_avg,ma_peak,min_cell_mv,max_cell_mv,soc,"
-                      "bms_soc,voltage_soc,temp_max_c\n";
-            headerSent = true;
-          }
-          while (pending.length() < maxLen && nextRow < rideLogger.size()) {
-            const RideLogger::Sample &s = rideLogger.at(nextRow);
-            char line[96];
-            snprintf(line, sizeof(line), "%u,%u,%d,%d,%u,%u,%d,%d,%d,%u\n",
-                     (unsigned)rideLogger.secondsAt(nextRow), s.total_mv,
-                     s.current_ma_avg, s.current_ma_peak, s.min_cell_mv,
-                     s.max_cell_mv, s.soc, s.bms_soc, s.voltage_soc,
-                     s.temp_max_c);
-            pending.concat(line);
-            nextRow++;
-          }
-          const size_t n = std::min<size_t>(maxLen, pending.length());
-          memcpy(buffer, pending.c_str(), n);
-          pending.remove(0, n);
-          return n;  // 0 ends the response once everything has been sent
-        });
-    response->addHeader("Content-Disposition",
-                        "attachment; filename=\"owie-ride-log.csv\"");
-    request->send(response);
-  });
-
   webServer.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send_P(200, "text/html", INDEX_HTML_PROGMEM_ARRAY, INDEX_HTML_SIZE,
                     templateProcessor);
@@ -546,19 +434,8 @@ void setupWebServer(BmsRelay *bmsRelay) {
                         BATTERY_HTML_SIZE, templateProcessor);
         return;
       case HTTP_POST:
-        if (request->getParam("clear_ridelog", true) != nullptr) {
-          rideLogger.clear();
-        } else if (request->getParam("relearn", true) != nullptr) {
-          // Forget everything learned about this battery, in memory and in the
-          // copy saved in flash, and start learning again.
+        if (request->getParam("reset_stats", true) != nullptr) {
           relay->getBatteryFuelGauge().reset();
-          Settings->battery_state = BatteryStateMsg_init_default;
-          saveSettings();
-        } else if (request->getParam("reset_stats", true) != nullptr) {
-          relay->getBatteryFuelGauge().reset();
-        } else if (request->getParam("reset_settings", true) != nullptr) {
-          Settings->battery_state = BatteryStateMsg_init_default;
-          saveSettings();
         }
         request->redirect("/battery");
         return;
@@ -595,9 +472,12 @@ void setupWebServer(BmsRelay *bmsRelay) {
                     MONITOR_HTML_SIZE, templateProcessor);
   });
   webServer.on("/stockmode", HTTP_GET, [](AsyncWebServerRequest *request) {
+    // Two characters: stock regen/range estimator, then stock battery %.
     const bool regen =
         Settings->pass_through_current && Settings->pass_through_status;
-    request->send(200, "text/plain", regen ? "1" : "0");
+    String state = regen ? "1" : "0";
+    state.concat(Settings->pass_through_soc ? "1" : "0");
+    request->send(200, "text/plain", state);
   });
   webServer.on("/settings", HTTP_ANY, [](AsyncWebServerRequest *request) {
     switch (request->method()) {
@@ -638,29 +518,6 @@ void setupWebServer(BmsRelay *bmsRelay) {
               "Wifi Power range MUST be between 8 (dBm) and 17 (dBm).");
           return;
         }
-        // Battery pack description (optional; all four fields travel together).
-        const auto packCell = request->getParam("pack_cell", true);
-        const auto packS = request->getParam("pack_s", true);
-        const auto packP = request->getParam("pack_p", true);
-        const auto packMah = request->getParam("pack_mah", true);
-        const uint32_t cellType =
-            packCell == nullptr ? 0 : packCell->value().toInt();
-        const uint32_t series = packS == nullptr ? 0 : packS->value().toInt();
-        const uint32_t parallel = packP == nullptr ? 0 : packP->value().toInt();
-        const uint32_t customMah =
-            packMah == nullptr ? 0 : packMah->value().toInt();
-        if (!battery_pack::validSettings(cellType, series, parallel,
-                                         customMah)) {
-          request->send(400, "text/html",
-                        "Battery pack: series must be 1-30, parallel 1-20 and "
-                        "a custom cell 500-10000 mAh.");
-          return;
-        }
-        Settings->pack_cell_type = cellType;
-        Settings->pack_series = cellType == 0 ? 0 : series;
-        Settings->pack_parallel = cellType == 0 ? 0 : parallel;
-        Settings->pack_custom_cell_mah =
-            cellType == battery_pack::CELL_CUSTOM ? customMah : 0;
         Settings->wifi_power = wifiPower->value().toInt();
         // Unchecked checkboxes aren't sent in the form post, so a missing
         // param means "off".
@@ -668,9 +525,8 @@ void setupWebServer(BmsRelay *bmsRelay) {
             request->getParam("stock_regen", true) != nullptr;
         Settings->pass_through_current = stockRegen;
         Settings->pass_through_status = stockRegen;
-        // Owie's own battery percentage is always used; the old "stock
-        // battery percentage" option was removed.
-        Settings->pass_through_soc = false;
+        Settings->pass_through_soc =
+            request->getParam("stock_soc", true) != nullptr;
         snprintf(Settings->ap_self_password, sizeof(Settings->ap_self_password),
                  "%s", apSelfPassword->value().c_str());
         snprintf(Settings->ap_self_name, sizeof(Settings->ap_self_name), "%s",

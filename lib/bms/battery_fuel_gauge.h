@@ -38,37 +38,6 @@ class BatteryFuelGauge {
   int32_t getSoc() const;
   int32_t getVoltageBasedSoc() const { return voltage_based_soc_; }
 
-  // Pack capacity in mAh implied by the tracked range: the charge drawn across
-  // the range divided by the share of the pack that range covers. -1 until the
-  // range spans at least MIN_CAPACITY_WINDOW_SOC points; narrower ranges are
-  // too noisy to mean anything. Works for any pack, set up in Settings or not.
-  static constexpr int32_t MIN_CAPACITY_WINDOW_SOC = 40;
-  int32_t getEstimatedCapacityMah() const {
-    const int32_t window = state_.topSoc - state_.bottomSoc;
-    if (window < MIN_CAPACITY_WINDOW_SOC || state_.bottomMilliampSeconds <= 0) {
-      return -1;
-    }
-    return (int32_t)((int64_t)state_.bottomMilliampSeconds / 3600 * 100 /
-                     window);
-  }
-
-  // How much of the pack's range Owie has learned so far, 0-100: the width of
-  // the tracked range relative to LEARNED_WINDOW_SOC points. 100 means
-  // "learned" (the gauge has seen a wide enough span to calibrate itself).
-  static constexpr int32_t LEARNED_WINDOW_SOC = 60;
-  int32_t getLearningProgressPercent() const {
-    if (state_.bottomMilliampSeconds <= 0) {
-      return 0;
-    }
-    const int32_t window = state_.topSoc - state_.bottomSoc;
-    if (window <= 0) {
-      return 0;
-    }
-    return window >= LEARNED_WINDOW_SOC ? 100
-                                        : window * 100 / LEARNED_WINDOW_SOC;
-  }
-  bool isLearned() const { return getLearningProgressPercent() >= 100; }
-
   int32_t getMilliampSecondsDischarged() {
     return milliamp_seconds_discharged_;
   }

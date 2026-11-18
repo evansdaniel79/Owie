@@ -12,24 +12,6 @@ inline int16_t int16FromNetworkOrder(const void* const p) {
   return ((uint16_t)(*charPointer)) << 8 | *(charPointer + 1);
 }
 
-// Bits 7:6 of the BMS status byte (message 0x0) are the BMS's own coarse
-// state of charge: 00 = above 80 %, 01 = 50..80 %, 10 = 20..50 %,
-// 11 = 20 % or below.
-constexpr uint8_t STATUS_SOC_BUCKET_MASK = 0xC0;
-
-uint8_t socBucketBits(int soc_percent) {
-  if (soc_percent > 80) {
-    return 0x00;
-  }
-  if (soc_percent > 50) {
-    return 0x40;
-  }
-  if (soc_percent > 20) {
-    return 0x80;
-  }
-  return 0xC0;
-}
-
 }  // namespace
 
 void BmsRelay::batteryPercentageParser(Packet& p) {
@@ -40,8 +22,7 @@ void BmsRelay::batteryPercentageParser(Packet& p) {
   bms_soc_percent_ = *(int8_t*)p.data();
   overridden_soc_percent_ = battery_fuel_gauge_.getSoc();
   if (pass_through_soc_) {
-    // Stock battery mode: leave the BMS value alone and forward it as is.
-    // overridden_soc_percent_ is still computed for the monitor page.
+    // Stock battery percentage switch: forward the BMS value untouched.
     return;
   }
   if (overridden_soc_percent_ < 0) {
@@ -224,17 +205,10 @@ void BmsRelay::bmsStatusParser(Packet& p) {
   // Forwarding the status packet during normal operation seems to drive
   // an event loop in the controller that tallies used Ah and eventually
   // makes the board throw Error 23. Swallowing the packet does the trick.
-  // Stock battery mode (pass_through_status_) forwards it regardless.
+  // The stock regen / range estimator switch (pass_through_status_) forwards it
+  // regardless.
   p.setShouldForward(pass_through_status_ || isCharging() || isBatteryEmpty() ||
                      isBatteryTempOutOfRange() || isBatteryOvercharged());
   battery_fuel_gauge_.updateChargingStatus(isCharging());
-
-  // When the packet does go out, make its SOC bucket (bits 7:6) agree with
-  // the percentage we report in message 0x3 instead of the BMS's own idea of
-  // the pack, which is wrong for an expanded battery. In stock battery mode
-  // message 0x3 is the BMS's own value, so leave the bucket alone too.
-  if (!pass_through_soc_ && overridden_soc_percent_ >= 0) {
-    p.data()[0] = (last_status_byte_ & ~STATUS_SOC_BUCKET_MASK) |
-                  socBucketBits(overridden_soc_percent_);
-  }
+}
 }

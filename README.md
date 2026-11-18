@@ -6,9 +6,9 @@ Owie sits between a OneWheel's BMS and controller (Pint, Pint X, XR). It unlocks
 
 **What this fork adds**
 
-- **Stock regen & range estimator switch** - one switch in Settings that gives you the stock regen readout and Future Motion's range estimator back. For stock (NON-upgraded) batteries only. Off by default.
+- **Two stock-behavior switches** - in Settings: one uses Future Motion's own battery percentage, the other gives you the stock regen, usage and range estimator back. For stock (NON-upgraded) batteries only. Both off by default.
 - **New phone-friendly UI** with an **Advanced Info** page.
-- Fuel gauge fixes, battery state saving on shutdown, max current display, and a ride logger (Advanced Info) that saves a CSV.
+- Max current display and an Advanced Info page. Owie's battery percentage is the original, unchanged.
 
 <p>
 <img src="docs/img/ui_status.png" height="400px">
@@ -92,11 +92,14 @@ How it looks in my setup:
 
 <img src="docs/img/wemos_d1_installed.jpg" height="180px">
 
-# Stock regen & range estimator
+# Stock battery behavior
 
-Normally Owie hides the board's own regen readout and range estimator, because they are wrong on an upgraded pack. If you have the **stock battery**, turn on **Use stock regen & range estimator** in Settings and press Save. The board restarts and the app shows them again. Leave it **off** for an upgraded pack. Owie always shows its own battery percentage.
+Normally Owie hides the board's own battery readouts, because they are wrong on an upgraded pack. If you have the **stock battery**, Settings has two switches (press Save, the board restarts):
 
-Forwarding the status packet might cause Error 23 on some boards. If you see an error, turn the switch off and save.
+- **Stock battery percentage** - uses Future Motion's own percentage instead of Owie's.
+- **Stock regen & range estimator** - the app shows regen, usage and the range estimator again.
+
+Leave both **off** for an upgraded pack. Forwarding the status packet might cause Error 23 on some boards; if you see an error, turn the regen and range switch off and save.
 
 # Board Locking functionality
 

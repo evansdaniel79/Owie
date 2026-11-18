@@ -20,67 +20,6 @@
         <h1>Advanced Info</h1>
 
         <div class="section">
-            <h2 class="section-title">Battery</h2>
-            <table>
-                <tr>
-                    <th>Battery learning</th>
-                    <td>%LEARN_STATUS%</td>
-                </tr>
-                <tr>
-                    <th>SOC</th>
-                    <td>%OVERRIDDEN_SOC%%%</td>
-                </tr>
-                <tr>
-                    <th>Voltage based SOC</th>
-                    <td>%VOLTAGE_BASED_SOC%%%</td>
-                </tr>
-                <tr>
-                    <th>Lowest Ah-tracked SOC</th>
-                    <td>%BOTTOM_SOC%%%</td>
-                </tr>
-                <tr>
-                    <th>Highest Ah-tracked SOC</th>
-                    <td>%TOP_SOC%%%</td>
-                </tr>
-                <tr>
-                    <th>Ah-tracked range size</th>
-                    <td>%BOTTOM_MILLIAMP_HOURS% mAh</td>
-                </tr>
-                <tr>
-                    <th>Current discharge depth</th>
-                    <td>%CURRENT_MILLIAMP_HOURS% mAh</td>
-                </tr>
-            </table>
-        </div>
-
-        <div class="section">
-            <h2 class="section-title">Battery Pack</h2>
-            <table>
-                <tr>
-                    <th>Pack</th>
-                    <td>%PACK_NAME%</td>
-                </tr>
-                <tr>
-                    <th>Rated capacity</th>
-                    <td>%PACK_RATED_MAH%</td>
-                </tr>
-                <tr>
-                    <th>Rated energy</th>
-                    <td>%PACK_RATED_WH%</td>
-                </tr>
-                <tr>
-                    <th>Learned capacity</th>
-                    <td>%PACK_LEARNED_MAH%</td>
-                </tr>
-                <tr>
-                    <th>Battery health</th>
-                    <td>%PACK_HEALTH%</td>
-                </tr>
-            </table>
-            <p class="field-hint" style="margin-top:12px">Learned capacity improves with use; it needs a ride covering about half the pack. Health is the learned capacity compared with the rated capacity, and is an estimate.</p>
-        </div>
-
-        <div class="section">
             <h2 class="section-title">BMS Info</h2>
             <table>
                 <tr>
@@ -115,6 +54,40 @@
         </div>
 
         <details class="section">
+            <summary class="section-title">Battery Tracking</summary>
+            <table>
+                <tr>
+                    <th>SOC</th>
+                    <td>%OVERRIDDEN_SOC%%%</td>
+                </tr>
+                <tr>
+                    <th>BMS reported SOC</th>
+                    <td>%BMS_SOC%</td>
+                </tr>
+                <tr>
+                    <th>Voltage based SOC</th>
+                    <td>%VOLTAGE_BASED_SOC%</td>
+                </tr>
+                <tr>
+                    <th>Lowest Ah-tracked SOC</th>
+                    <td>%BOTTOM_SOC%</td>
+                </tr>
+                <tr>
+                    <th>Highest Ah-tracked SOC</th>
+                    <td>%TOP_SOC%</td>
+                </tr>
+                <tr>
+                    <th>Ah-tracked range size</th>
+                    <td>%BOTTOM_MILLIAMP_HOURS%</td>
+                </tr>
+                <tr>
+                    <th>Current discharge depth</th>
+                    <td>%CURRENT_MILLIAMP_HOURS%</td>
+                </tr>
+            </table>
+        </details>
+
+        <details class="section">
             <summary class="section-title">Serial Numbers</summary>
             <table>
                 <tr>
@@ -136,36 +109,13 @@
             </table>
         </details>
 
-        <div class="section">
-            <h2 class="section-title">Ride Log</h2>
-            <p class="field-hint" style="margin:0 0 12px">The board records voltage, current and temperatures by itself, so your phone can stay in your pocket with the screen off. After the ride, leave the board on, connect to Owie and download the log. It is lost when the board powers off.</p>
-            <p class="field-hint" style="margin:0 0 12px">%RIDELOG_STATUS%</p>
-            <div class="btn-row">
-                <form action="/ridelog.csv">
-                    <button>Download ride log (CSV)</button>
-                </form>
-                <form method="post" onsubmit="return confirm('Clear the ride log?');">
-                    <input type="hidden" name="clear_ridelog">
-                    <button class="btn-secondary">Clear ride log</button>
-                </form>
-            </div>
-        </div>
-
         <div class="btn-row">
-                <button type="button" id="logToggle">Start recording</button>
-                <button type="button" id="logDownload" class="btn-secondary" disabled>Download CSV</button>
-            </div>
-        </div>
-
-        <div class="btn-row">
-            <form method="post" onsubmit="return confirm('Forget what Owie has learned about this battery and start learning again?');">
-                <input type="hidden" name="relearn">
-                <button>Relearn battery</button>
+            <form method="post" onsubmit="return confirm('Reset the battery tracking? It starts over from now.');">
+                <input type="hidden" name="reset_stats">
+                <button>Reset battery tracking</button>
             </form>
             <button class="btn-secondary" onclick="history.back()">Back</button>
         </div>
-
-        <p class="field-hint">Battery learning shows whether Owie has seen enough of your pack's range to calibrate its percentage. Relearn battery forgets all of it and starts over, for example after changing the battery. It does not touch your WiFi or other settings.</p>
     </main>
 </body>
 
