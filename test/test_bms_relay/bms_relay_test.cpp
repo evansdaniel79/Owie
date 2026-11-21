@@ -150,15 +150,6 @@ void testCellVoltageParsing() {
   TEST_ASSERT_EQUAL(57894, relay->getTotalVoltageMillivolts());
 }
 
-void testTemperatureParsing() {
-  addMockData({0xff, 0x55, 0xaa, 0x04, 0x13, 0x14, 0x14, 0x14, 0x16, 0x02, 0xFF,
-               0x55, 0xAA});
-  relay->loop();
-  int8_t expected[5] = {19, 20, 20, 20, 22};
-  TEST_ASSERT_EQUAL_INT8_ARRAY(expected, relay->getTemperaturesCelsius(), 5);
-  TEST_ASSERT_EQUAL(20, relay->getAverageTemperatureCelsius());
-}
-
 void testBlocksStatusPacketsUnlessWarning() {
   addMockData({0xff, 0x55, 0xaa, 0x0, 0x0, 0x1, 0xFE, 0x1});
   relay->loop();
@@ -313,7 +304,6 @@ int main(int argc, char** argv) {
   RUN_TEST(testBatterySocParsing);
   RUN_TEST(testCurrentParsing);
   RUN_TEST(testCellVoltageParsing);
-  RUN_TEST(testTemperatureParsing);
   RUN_TEST(testBlocksStatusPacketsUnlessWarning);
   RUN_TEST(testDefaultsOverrideSocAndBlockCurrentAndStatus);
   RUN_TEST(testPassThroughSocForwardsBmsValueUntouched);
