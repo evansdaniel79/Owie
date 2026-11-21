@@ -66,25 +66,27 @@ void bms_setup() {
     streamBMSPacket(&unknownData[0], unknownData.size());
   });
 
-  // Never restore a saved gauge state: older fork builds stored one that can be
-  // badly stale and made the percentage jump. Drop it; the gauge starts fresh
-  // exactly like stock Owie.
+  // Earlier fork builds saved a gauge state; stock Owie never does. Drop it so
+  // a stale value can't skew the percentage.
   if (Settings->has_battery_state) {
     Settings->has_battery_state = false;
     saveSettings();
   }
 
-  // The BMS sends a header-less fault code ("BU" for the power button, ...)
-  // right before it powers off; count it for the "Power cycles" row.
-  relay->setShutdownCallback([](const char *) {
-    Settings->graceful_shutdown_count++;
-    saveSettings();
-  });
+  // relay->setPowerOffCallback([]() {
+  //   Settings->graceful_shutdown_count++;
+  //   const FuelGaugeState &gaugeState = relay->getBatteryFuelGauge().getState();
 
-  // Accepted by controllers regardless of the real BMS serial (see the
-  // README). The same value has been seen programmed as the user ID of a
-  // stock late-model XR BMS, so it looks like a factory default rather than
-  // a random pick.
+  //   Settings->has_battery_state = true;
+  //   Settings->battery_state.bottom_milliamp_seconds =
+  //       gaugeState.bottomMilliampSeconds;
+  //   Settings->battery_state.current_milliamp_seconds =
+  //       gaugeState.currentMilliampSeconds;
+  //   Settings->battery_state.bottom_soc = gaugeState.bottomSoc;
+  //   Settings->battery_state.top_soc = gaugeState.topSoc;
+  //   saveSettings();
+  // });
+
   relay->setBMSSerialOverride(0xFFABCDEF);
 
   // Stock behavior switches from the Settings page (default off).
@@ -95,5 +97,4 @@ void bms_setup() {
   setupWifi();
   setupWebServer(relay);
   TaskQueue.postRecurringTask([]() { relay->loop(); });
-
 }

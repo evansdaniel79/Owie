@@ -30,16 +30,6 @@ class BmsRelay {
 
   typedef std::function<unsigned long()> MillisProvider;
 
-  /**
-   * @brief Called once when the BMS announces that it is powering off.
-   * Right before shutting down the BMS sends a bare ASCII fault code without
-   * any frame header ("BU" = power button, "DC" = done charging, "CD" =
-   * charger disconnected, "ZC" = idle timeout, "UV"/"CUV"/"OV"/"OT"/"OC"/
-   * "QC"/"PR"/"CS"/"CC" = protections), then drains its TX buffer and waits
-   * about a second before cutting power. The argument is that code.
-   */
-  typedef std::function<void(const char*)> ShutdownCallback;
-
   BmsRelay(const Source& source, const Sink& sink,
            const MillisProvider& millisProvider);
 
@@ -59,26 +49,6 @@ class BmsRelay {
 
   void setUnknownDataCallback(const Sink& c) { unknownDataCallback_ = c; }
 
-  void setShutdownCallback(const ShutdownCallback& c) { shutdownCallback_ = c; }
-
-  /**
-   * @brief Seconds until the BMS shuts itself down, as last announced in
-   * message 0x01, or -1 when no warning was received in the last 2 seconds.
-   */
-  int getShutdownCountdownSeconds();
-
-  /**
-   * @brief Reason bit mask of the last 0x01 warning: 1 = over-voltage,
-   * 2 = under-voltage, 4 = over-temperature, 8 = idle (zero current) timer.
-   */
-  uint8_t getShutdownReasonMask() { return shutdown_reason_mask_; }
-
-  /**
-   * @brief Fault code text the BMS sent before powering off ("BU", "DC",
-   * ...), empty string if none was seen yet.
-   */
-  const char* getShutdownCode() { return shutdown_code_; }
-
   /**
    * @brief If set to non-zero value, spoofs captured BMS serial
    * with the number provided here. The serial number can be found
@@ -94,13 +64,6 @@ class BmsRelay {
    * @return non-zero serial, if it's already been captured.
    */
   uint32_t getCapturedBMSSerial() { return captured_serial_; }
-
-  /**
-   * @brief Get the BMS serial override value.
-   *
-   * @return The serial override value, or 0 if not set.
-   */
-  uint32_t getBMSSerialOverride() { return serial_override_; }
 
   /**
    * @brief Battery percentage as reported by the BMS.
@@ -120,40 +83,17 @@ class BmsRelay {
   uint16_t getTotalVoltageMillivolts() { return total_voltage_millivolts_; }
 
   /**
-   * @brief Value the BMS reports when a thermistor reads above its clamp
-   * (105 C for the pack sensors, 175 C for the board sensor), e.g. a shorted
-   * sensor - the BMS's own "sensor error" case. An open sensor reads as 0 C.
-   */
-  static constexpr uint8_t TEMPERATURE_INVALID = 0xFF;
-
-  /**
-   * @brief Temperatures in degrees Celsius, unsigned (0 = 0 C or below).
-   * Indices 0..3 are the pack thermistors, index 4 (BOARD_TEMPERATURE_INDEX)
-   * is a thermistor on the BMS board itself with a different NTC curve - it
-   * is not part of the pack temperature. TEMPERATURE_INVALID marks a bad
-   * reading.
+   * @brief Cell voltages in millivolts.
    * @return pointer to a 5 element array.
    */
-  const uint8_t* getTemperaturesCelsius() { return temperatures_celsius_; }
+  int8_t* const getTemperaturesCelsius() { return temperatures_celsius_; }
 
-  static constexpr int BOARD_TEMPERATURE_INDEX = 4;
-
-  /**
-   * @brief Average of the valid pack thermistors (indices 0..3), 0 if none is
-   * valid.
-   */
   uint8_t getAverageTemperatureCelsius() { return avg_temperature_celsius_; }
 
   /**
    * @brief Current In Amps.
    */
   int32_t getCurrentMilliamps() { return current_milliamps_; }
-
-  /**
-   * @brief Highest discharge current seen since Owie started (this power
-   * cycle), in milliamps. Regen (negative current) never lowers it.
-   */
-  int32_t getMaxCurrentMilliamps() { return max_current_milliamps_; }
 
   int32_t getUsedChargeMah() {
     return battery_fuel_gauge_.getMilliampSecondsDischarged() / 3600;
@@ -162,10 +102,6 @@ class BmsRelay {
     return battery_fuel_gauge_.getMilliampSecondsRecharged() / 3600;
   }
 
-  // Status byte (message 0x0) as received from the BMS: bits 1:0 temperature
-  // (01 hot, 10 cold, 11 sensor error), bits 3:2 voltage (01 under-voltage,
-  // 10 over-voltage), bit 4 balancing, bit 5 charger detected, bits 7:6 the
-  // BMS's own SOC bucket (rewritten on forward, see bmsStatusParser).
   bool isCharging() { return last_status_byte_ & 0x20; }
   bool isBatteryEmpty() { return last_status_byte_ & 0x4; }
   bool isBatteryTempOutOfRange() {
@@ -174,20 +110,6 @@ class BmsRelay {
     return last_status_byte_ & 3;
   }
   bool isBatteryOvercharged() { return last_status_byte_ & 8; }
-
-  // Safety net, active in every switch combination: when the weakest cell is
-  // this low the board must hear the BMS's own low-battery signals (SOC byte
-  // and status packet) no matter what the gauge or the stock switches say.
-  static constexpr uint16_t LOW_CELL_MV = 3250;
-  bool isCellVoltageLow() {
-    uint16_t lowest = 0;
-    for (int i = 0; i < 15; i++) {
-      if (cell_millivolts_[i] > 0 && (lowest == 0 || cell_millivolts_[i] < lowest)) {
-        lowest = cell_millivolts_[i];
-      }
-    }
-    return lowest != 0 && lowest < LOW_CELL_MV;
-  }
 
   // ---- BMS identity and health, from messages 0x07/0x08/0x09/0x0B/0x0C/0x0D ----
 
@@ -256,41 +178,25 @@ class BmsRelay {
   static constexpr int CURRENT_SCALER = 55;
   void processNextByte();
   void purgeUnknownData();
-  void trackUnknownByte(uint8_t b);
   void maybeReplayPackets();
   void ingestPacket(Packet& p);
 
   std::vector<PacketCallback> receivedPacketCallbacks_;
   std::vector<PacketCallback> forwardedPacketCallbacks_;
   Sink unknownDataCallback_;
-  ShutdownCallback shutdownCallback_;
-
-  // Detection of the header-less fault code that precedes a BMS power-off:
-  // the first bytes of an unknown-data run that directly follows a valid
-  // packet.
-  bool seen_valid_packet_ = false;
-  uint8_t unknown_run_[3] = {0};
-  uint8_t unknown_run_len_ = 0;
-  bool unknown_run_fired_ = false;
-  char shutdown_code_[4] = {0};
-
-  int8_t shutdown_countdown_seconds_ = -1;
-  uint8_t shutdown_reason_mask_ = 0;
-  int32_t shutdown_warning_millis_ = 0;
 
   std::vector<uint8_t> sourceBuffer_;
   uint32_t serial_override_ = 0;
   uint32_t captured_serial_ = 0;
   int16_t current_milliamps_ = 0;
-  int16_t max_current_milliamps_ = 0;
 
   int8_t bms_soc_percent_ = -1;
   int8_t overridden_soc_percent_ = -1;
   uint16_t cell_millivolts_[15] = {0};
   uint16_t total_voltage_millivolts_ = 0;
 
-  uint8_t temperatures_celsius_[5] = {0};
-  uint8_t avg_temperature_celsius_ = 0;
+  int8_t temperatures_celsius_[5] = {0};
+  int8_t avg_temperature_celsius_ = 0;
   uint8_t last_status_byte_ = 0;
   bool pass_through_soc_ = false;
   bool pass_through_current_ = false;
@@ -314,7 +220,6 @@ class BmsRelay {
   BatteryFuelGauge battery_fuel_gauge_;
 
   void bmsStatusParser(Packet& p);
-  void shutdownWarningParser(Packet& p);
   void bmsSerialParser(Packet& p);
   void currentParser(Packet& p);
   void batteryPercentageParser(Packet& p);

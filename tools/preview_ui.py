@@ -8,7 +8,7 @@ import http.server, json, os, re, sys
 DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
 CELLS = "".join(f"<tr><th>Cell {i+1}</th><td>{3.92+i*0.003:.3f}v</td></tr>" for i in range(15))
 VALS = {
-    "TOTAL_VOLTAGE": "58.84", "CURRENT_AMPS": "1.2", "MAX_CURRENT_AMPS": "18.4", "BMS_SOC": "71", "OVERRIDDEN_SOC": "68",
+    "TOTAL_VOLTAGE": "58.84", "CURRENT_AMPS": "1.2", "BMS_SOC": "71", "OVERRIDDEN_SOC": "68",
     "VOLTAGE_BASED_SOC": "69", "BOTTOM_SOC": "10", "TOP_SOC": "95", "BOTTOM_MILLIAMP_HOURS": "2500",
     "CURRENT_MILLIAMP_HOURS": "800", "USED_CHARGE_MAH": "1234", "REGENERATED_CHARGE_MAH": "210",
     "UPTIME": "0d 0h 12m 3s", "GRACEFUL_SHUTDOWN_COUNT": "4", "OWIE_version": "1.7.0",
@@ -18,7 +18,7 @@ VALS = {
     "CELL_VOLTAGE_TABLE": CELLS,
     "TEMPERATURE_TABLE": "<tr><th>Pack 1</th><td>24C</td></tr><tr><th>BMS board</th><td>31C</td></tr>",
     "PACKET_STATS_TABLE": "<tr><th>Type 0</th><td>100</td></tr>",
-    "BMS_WARNING": "none", "BMS_FIRMWARE_VERSION": "3001 (Pint)", "BMS_VARIANT": "1",
+    "BMS_FIRMWARE_VERSION": "3001 (Pint)", "BMS_VARIANT": "1",
     "BMS_LAST_SHUTDOWN": "BU - power button", "BMS_THRESHOLDS": "4.2/4.15/2.8V, 60C",
     "BMS_BALANCING": "none", "BMS_CYCLES": "12", "BMS_HEALTH": "98%",
     "RECEIVED_SERIAL_DEC": "1234567", "RECEIVED_SERIAL_HEX": "0x12D687",

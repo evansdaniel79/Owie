@@ -46,12 +46,6 @@ void sanitizeWifiPowerSetting() {
   }
 }
 
-void sanitizeWifiChannelSetting() {
-  if (Settings->wifi_channel > 11) {
-    Settings->wifi_channel = 0;
-  }
-}
-
 void loadSettings() {
   auto& e = getEeprom();
   uint16_t len = *(uint16_t*)e.getConstDataPtr();
@@ -60,7 +54,6 @@ void loadSettings() {
   if (pb_decode(&istream, &SettingsMsg_msg, Settings)) {
     DPRINTF("Read and decoded settings, size = %d bytes.", len);
     sanitizeWifiPowerSetting();
-    sanitizeWifiChannelSetting();
     return;
   }
   DPRINTLN("Failed to decode settings, resetting.");

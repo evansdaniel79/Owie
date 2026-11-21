@@ -140,24 +140,6 @@ void testCurrentParsing() {
   TEST_ASSERT_EQUAL(-1320, relay->getCurrentMilliamps());
 }
 
-void testMaxCurrentTracksPeakDischargeOnly() {
-  TEST_ASSERT_EQUAL(0, relay->getMaxCurrentMilliamps());
-  // Regen (-1320 mA) must not raise or lower the maximum.
-  addMockData({0xff, 0x55, 0xaa, 0x5, 0xff, 0xe8, 0x3, 0xea, 0xFF, 0x55, 0xAA});
-  relay->loop();
-  TEST_ASSERT_EQUAL(0, relay->getMaxCurrentMilliamps());
-  // +24 counts = +1320 mA discharge.
-  // (The previous frame's trailing FF 55 AA is already this frame's preamble.)
-  addMockData({0x5, 0x00, 0x18, 0x02, 0x1b, 0xFF, 0x55, 0xAA});
-  relay->loop();
-  TEST_ASSERT_EQUAL(1320, relay->getMaxCurrentMilliamps());
-  // A lower reading afterwards keeps the peak.
-  addMockData({0x5, 0xff, 0xe8, 0x3, 0xea, 0xFF, 0x55, 0xAA});
-  relay->loop();
-  TEST_ASSERT_EQUAL(1320, relay->getMaxCurrentMilliamps());
-  TEST_ASSERT_EQUAL(-1320, relay->getCurrentMilliamps());
-}
-
 void testCellVoltageParsing() {
   addMockData({0xff, 0x55, 0xaa, 0x02, 0x0f, 0x14, 0x0f, 0x14, 0x0f, 0x14, 0x0f,
                0x13, 0x0f, 0x14, 0x0f, 0x14, 0x0f, 0x14, 0x0f, 0x13, 0x0f, 0x14,
@@ -179,20 +161,6 @@ void testTemperatureParsing() {
   TEST_ASSERT_EQUAL_UINT8_ARRAY(expected, relay->getTemperaturesCelsius(), 5);
   // Average over the four pack sensors only (79 / 4), not the board sensor.
   TEST_ASSERT_EQUAL(19, relay->getAverageTemperatureCelsius());
-}
-
-void testTemperatureParsingInvalidSensorAndHighValues() {
-  // Sensor 1 out of range (0xFF), sensor 3 at 130 C (would be negative as
-  // int8), board sensor 0xFF.
-  addMockData({0xff, 0x55, 0xaa, 0x04, 0x13, 0xff, 0x14, 0x82, 0xff, 0x04, 0xa9,
-               0xFF, 0x55, 0xAA});
-  relay->loop();
-  uint8_t expected[5] = {19, 0xff, 20, 130, 0xff};
-  TEST_ASSERT_EQUAL_UINT8_ARRAY(expected, relay->getTemperaturesCelsius(), 5);
-  TEST_ASSERT_EQUAL(BmsRelay::TEMPERATURE_INVALID,
-                    relay->getTemperaturesCelsius()[1]);
-  // (19 + 20 + 130) / 3 = 56
-  TEST_ASSERT_EQUAL(56, relay->getAverageTemperatureCelsius());
 }
 
 void testBlocksStatusPacketsUnlessWarning() {
@@ -229,34 +197,6 @@ void testDefaultsOverrideSocAndBlockCurrentAndStatus() {
   addMockData(kStatusPacket);
   relay->loop();
   expectDataOut({});
-}
-
-// Every cell at 3100 mV: the weakest cell is nearly empty.
-const std::vector<uint8_t> kLowCellsPacket = {
-    0xff, 0x55, 0xaa, 0x2, 0xc, 0x1c, 0xc, 0x1c, 0xc, 0x1c, 0xc, 0x1c,
-    0xc,  0x1c, 0xc,  0x1c, 0xc, 0x1c, 0xc, 0x1c, 0xc, 0x1c, 0xc, 0x1c,
-    0xc,  0x1c, 0xc,  0x1c, 0xc, 0x1c, 0xc, 0x1c, 0xc, 0x1c, 0x0, 0x2a, 0x4, 0x82, 0xff, 0x55, 0xaa};
-
-void testLowCellVoltageAlwaysForwardsStatus() {
-  timeMillis = 0;
-  // Default switches (all off): status is normally swallowed...
-  addMockData(kStatusPacket);
-  relay->loop();
-  expectDataOut({});
-  // ...but never while a cell is nearly empty.
-  addMockData(kLowCellsPacket);
-  relay->loop();
-  mockDataOut.clear();
-  TEST_ASSERT_TRUE(relay->isCellVoltageLow());
-  // The cell packet's trailing preamble already started this status packet.
-  addMockData({0x0, 0x0, 0x1, 0xfe});
-  relay->loop();
-  expectDataOut(kStatusPacket);
-}
-
-void testHealthyCellVoltageIsNotLow() {
-  timeMillis = 0;
-  TEST_ASSERT_FALSE(relay->isCellVoltageLow());
 }
 
 void testPassThroughSocForwardsBmsValueUntouched() {
@@ -367,83 +307,6 @@ void testBmsInfoParsing() {
   TEST_ASSERT_EQUAL(71, relay->getStateOfHealthPercent());
 }
 
-void testShutdownWarningParsedAndNeverReplayed() {
-  timeMillis = 1000;
-  // 28 s left, reason 2 = under-voltage.
-  addMockData({0xff, 0x55, 0xaa, 0x01, 0x1c, 0x02, 0x02, 0x1d});
-  relay->loop();
-  expectDataOut({0xff, 0x55, 0xaa, 0x01, 0x1c, 0x02, 0x02, 0x1d});
-  TEST_ASSERT_EQUAL(28, relay->getShutdownCountdownSeconds());
-  TEST_ASSERT_EQUAL(2, relay->getShutdownReasonMask());
-  // Still valid just under 2 s later, gone after that.
-  timeMillis = 2999;
-  relay->loop();
-  TEST_ASSERT_EQUAL(28, relay->getShutdownCountdownSeconds());
-  timeMillis = 3001;
-  relay->loop();
-  TEST_ASSERT_EQUAL(-1, relay->getShutdownCountdownSeconds());
-  // Far in the future: no replay of the warning, unlike regular packets.
-  timeMillis = 100000;
-  relay->loop();
-  expectDataOut({});
-}
-
-void testShutdownCodeTriggersCallbackOnce() {
-  std::string code;
-  int fires = 0;
-  relay->setShutdownCallback([&](const char* c) {
-    code = c;
-    fires++;
-  });
-  const std::vector<uint8_t> validPacket = {0xff, 0x55, 0xaa, 0x08,
-                                            0x06, 0x02, 0x0c};
-  // Garbage before the first valid packet is ignored.
-  addMockData({'B', 'U'});
-  relay->loop();
-  TEST_ASSERT_EQUAL(0, fires);
-  TEST_ASSERT_EQUAL_STRING("", relay->getShutdownCode());
-
-  // Power button: "BU" right after a frame, followed by the 10-byte record
-  // that 4210/Pint boards append. Exactly one callback.
-  addMockData(validPacket);
-  relay->loop();
-  addMockData({'B', 'U'});
-  relay->loop();
-  TEST_ASSERT_EQUAL(1, fires);
-  TEST_ASSERT_EQUAL_STRING("BU", code.c_str());
-  TEST_ASSERT_EQUAL_STRING("BU", relay->getShutdownCode());
-  addMockData({0x07, 0xd7, 0xff, 0xab, 0xcd, 0xef, 0x03, 0x00, 0x10, 0x62});
-  relay->loop();
-  TEST_ASSERT_EQUAL(1, fires);
-
-  // Three-letter code.
-  addMockData(validPacket);
-  relay->loop();
-  addMockData({'C', 'U', 'V'});
-  relay->loop();
-  TEST_ASSERT_EQUAL(2, fires);
-  TEST_ASSERT_EQUAL_STRING("CUV", code.c_str());
-
-  // "PR" carries three binary bytes after the text; still one callback.
-  addMockData(validPacket);
-  relay->loop();
-  addMockData({'P', 'R', 0x50, 0x08, 0x00});
-  relay->loop();
-  TEST_ASSERT_EQUAL(3, fires);
-  TEST_ASSERT_EQUAL_STRING("PR", code.c_str());
-
-  // A run that does not start with a code never fires, even if a code
-  // appears later in it.
-  addMockData(validPacket);
-  relay->loop();
-  addMockData({'Z', 'Z', 'B', 'U'});
-  relay->loop();
-  TEST_ASSERT_EQUAL(3, fires);
-
-  // Unknown bytes are still forwarded unchanged.
-  TEST_ASSERT_TRUE(mockDataOut.size() > 0);
-}
-
 int main(int argc, char** argv) {
   UNITY_BEGIN();
   RUN_TEST(testUnknownDataAfterKnownPacketGetsFlushedImmediately);
@@ -453,22 +316,16 @@ int main(int argc, char** argv) {
   RUN_TEST(testPacketCallback);
   RUN_TEST(testBatterySocParsing);
   RUN_TEST(testCurrentParsing);
-  RUN_TEST(testMaxCurrentTracksPeakDischargeOnly);
   RUN_TEST(testCellVoltageParsing);
   RUN_TEST(testTemperatureParsing);
-  RUN_TEST(testTemperatureParsingInvalidSensorAndHighValues);
   RUN_TEST(testBlocksStatusPacketsUnlessWarning);
   RUN_TEST(testDefaultsOverrideSocAndBlockCurrentAndStatus);
   RUN_TEST(testPassThroughSocForwardsBmsValueUntouched);
   RUN_TEST(testPassThroughCurrentForwardsCurrentPacket);
   RUN_TEST(testPassThroughStatusForwardsStatusPacket);
   RUN_TEST(testPassThroughFlagsAreIndependent);
-  RUN_TEST(testLowCellVoltageAlwaysForwardsStatus);
-  RUN_TEST(testHealthyCellVoltageIsNotLow);
   RUN_TEST(testPacketReplay);
   RUN_TEST(testBmsInfoParsing);
-  RUN_TEST(testShutdownWarningParsedAndNeverReplayed);
-  RUN_TEST(testShutdownCodeTriggersCallbackOnce);
   UNITY_END();
 
   return 0;

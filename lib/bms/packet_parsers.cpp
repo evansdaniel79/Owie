@@ -22,16 +22,7 @@ void BmsRelay::batteryPercentageParser(Packet& p) {
   bms_soc_percent_ = *(int8_t*)p.data();
   overridden_soc_percent_ = battery_fuel_gauge_.getSoc();
   if (pass_through_soc_) {
-    // Stock battery percentage switch: forward the BMS value untouched.
-    return;
-  }
-  if (isCellVoltageLow()) {
-    // Low-battery safety: never report more than the BMS itself does while a
-    // cell is nearly empty, so the board always gets its low-battery warning.
-    if (bms_soc_percent_ >= 0 &&
-        (overridden_soc_percent_ < 0 || bms_soc_percent_ < overridden_soc_percent_)) {
-      return;  // forward the BMS value untouched
-    }
+    return;  // stock battery % switch: BMS value forwarded untouched
   }
   if (overridden_soc_percent_ < 0) {
     p.setShouldForward(false);
@@ -46,16 +37,10 @@ void BmsRelay::currentParser(Packet& p) {
   }
   p.setShouldForward(pass_through_current_ || isCharging());
 
-  // 0x5 message encodes current as signed int16 in raw BMS ADC counts,
-  // positive = discharge. The scaling factor (tested on a Pint) is 0.055,
-  // i.e. 1 count corresponds to 55 milliamps. That matches the BMS hardware
-  // (12-bit ADC, 4.5 V reference, 1 mOhm shunt behind a gain-20 amplifier
-  // -> 54.9 mA/count) and the BMS's own state-of-charge full-scale
-  // constants, so it applies to XR and Pint boards alike.
+  // 0x5 message encodes current as signed int16.
+  // The scaling factor (tested on a Pint) seems to be 0.055
+  // i.e. 1 in the data message below corresponds to 55 milliamps.
   current_milliamps_ = int16FromNetworkOrder(p.data()) * CURRENT_SCALER;
-  if (current_milliamps_ > max_current_milliamps_) {
-    max_current_milliamps_ = current_milliamps_;
-  }
   battery_fuel_gauge_.updateCurrent(current_milliamps_, now_millis_);
 }
 
@@ -64,12 +49,7 @@ void BmsRelay::bmsSerialParser(Packet& p) {
     return;
   }
   // 0x6 message has the BMS serial number encoded inside of it.
-  // It is the last seven digits from the sticker on the back of the BMS. On
-  // the BMS side these are the low bytes of the four user-ID words of its
-  // microcontroller; the BMS only reports them and never checks anything, so
-  // whatever pairing exists is decided by the controller. XR BMSes with
-  // firmware 2006 (hardware 4206-4209) do not send this message at all;
-  // 4210 and Pint boards do.
+  // It is the last seven digits from the sticker on the back of the BMS.
   if (captured_serial_ == 0) {
     for (int i = 0; i < 4; i++) {
       captured_serial_ |= p.data()[i] << (8 * (3 - i));
@@ -89,12 +69,8 @@ void BmsRelay::cellVoltageParser(Packet& p) {
   if (p.getType() != 2) {
     return;
   }
-  // The data in this packet is 16 uint16-s. The first 15 are the individual
-  // cell voltages in millivolts. The 16th is not a cell: the BMS's send loop
-  // runs one word past its 15-entry cell array, so the word that follows it
-  // in BMS RAM goes out too - the BMS's millisecond counter since its
-  // one-second tick, typically 42 (the time its measurement block needs to
-  // get to this message).
+  // The data in this packet is 16 int16-s. First 15 of them is
+  // individual cell voltages in millivolts. The last value is mysterious.
   const uint8_t* const data = p.data();
   uint16_t total_voltage = 0;
   uint16_t min_voltage = 0xFFFF;
@@ -114,39 +90,28 @@ void BmsRelay::temperatureParser(Packet& p) {
   if (p.getType() != 4) {
     return;
   }
-  // 0x4 message: five unsigned bytes in degrees Celsius. The BMS clamps at
-  // 0 C from below and reports 0xFF for a reading above the clamp (its
-  // "sensor error" case, e.g. a shorted thermistor). The
-  // first four are the pack thermistors; the fifth sits on the BMS board
-  // (different NTC curve, 175 C clamp) and the BMS itself leaves it out of
-  // its own min/max logic, so it is left out of the average here too.
-  const uint8_t* const temperatures = p.data();
-  uint16_t temperature_sum = 0;
-  uint8_t valid_count = 0;
+  int8_t* const temperatures = (int8_t*)p.data();
+  int16_t temperature_sum = 0;
   for (int i = 0; i < 5; i++) {
-    const uint8_t temp = temperatures[i];
-    temperatures_celsius_[i] = temp;
-    if (i == BOARD_TEMPERATURE_INDEX || temp == TEMPERATURE_INVALID) {
-      continue;
-    }
+    int8_t temp = temperatures[i];
     temperature_sum += temp;
-    valid_count++;
+    temperatures_celsius_[i] = temp;
   }
-  avg_temperature_celsius_ =
-      valid_count == 0 ? 0 : temperature_sum / valid_count;
+  avg_temperature_celsius_ = temperature_sum / 5;
 }
 
-void BmsRelay::shutdownWarningParser(Packet& p) {
-  if (p.getType() != 1) {
+void BmsRelay::bmsStatusParser(Packet& p) {
+  if (p.getType() != 0) {
     return;
   }
-  // 0x1 message: the BMS is counting down to a protective power-off. Sent
-  // every 100 ms while any countdown is below 29 s. Byte 0 = seconds left,
-  // byte 1 = reason mask (1 over-voltage, 2 under-voltage, 4 over-temperature,
-  // 8 idle timer). Forwarded unchanged.
-  shutdown_countdown_seconds_ = p.data()[0];
-  shutdown_reason_mask_ = p.data()[1];
-  shutdown_warning_millis_ = now_millis_;
+  last_status_byte_ = p.data()[0];
+
+  // Forwarding the status packet during normal operation seems to drive
+  // an event loop in the controller that tallies used Ah and eventually
+  // makes the board throw Error 23. Swallowing the packet does the trick.
+  p.setShouldForward(pass_through_status_ || isCharging() || isBatteryEmpty() ||
+                     isBatteryTempOutOfRange() || isBatteryOvercharged());
+  battery_fuel_gauge_.updateChargingStatus(isCharging());
 }
 
 void BmsRelay::bmsInfoParser(Packet& p) {
@@ -202,20 +167,4 @@ const char* BmsRelay::shutdownReasonName(uint8_t code) {
     return "unknown";
   }
   return NAMES[code];
-}
-
-void BmsRelay::bmsStatusParser(Packet& p) {
-  if (p.getType() != 0) {
-    return;
-  }
-  last_status_byte_ = p.data()[0];
-
-  // Forwarding the status packet during normal operation seems to drive
-  // an event loop in the controller that tallies used Ah and eventually
-  // makes the board throw Error 23. Swallowing the packet does the trick.
-  // The stock regen / range estimator switch (pass_through_status_) forwards it
-  // regardless.
-  p.setShouldForward(pass_through_status_ || isCharging() || isBatteryEmpty() ||
-                     isCellVoltageLow() || isBatteryTempOutOfRange() || isBatteryOvercharged());
-  battery_fuel_gauge_.updateChargingStatus(isCharging());
 }

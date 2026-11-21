@@ -37,14 +37,6 @@
             %WIFI_POWER_OPTIONS%
           </select>
         </div>
-        <div class="field">
-          <label>WiFi channel</label>
-          <select name="wifichannel" id="wifichannel">
-            <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option><option>10</option><option>11</option>
-          </select>
-        </div>
-        <button type="button" id="scanBtn" class="btn-secondary">Find quietest channel</button>
-        <p class="field-hint" id="scanMsg">Pick a less crowded channel if the connection is slow. Applied on Save. Ignored while Owie is joined to a home WiFi network.</p>
       </div>
 
       <div class="section">
@@ -78,47 +70,6 @@
       <button class="btn-secondary" onclick="history.back()">Back</button>
     </div>
 
-    <script>
-      (() => {
-        const sel = document.getElementById("wifichannel");
-        const btn = document.getElementById("scanBtn");
-        const msg = document.getElementById("scanMsg");
-        const get = (url, cb, fail) => {
-          const x = new XMLHttpRequest();
-          x.open("GET", url);
-          x.timeout = 4000;
-          x.onload = () => cb(x.status === 200 ? x.responseText : null);
-          x.onerror = x.ontimeout = () => fail();
-          x.send();
-        };
-        get("/wifichannel", (t) => { if (t) sel.value = t.trim(); }, () => {});
-        btn.onclick = () => {
-          btn.disabled = true;
-          msg.textContent = "Scanning nearby networks... your connection may drop for a few seconds.";
-          get("/wifiscan?start=1", () => {}, () => {});
-          let tries = 0;
-          const poll = () => {
-            if (++tries > 20) {
-              msg.textContent = "Scan did not finish. Reconnect to Owie and try again.";
-              btn.disabled = false;
-              return;
-            }
-            get("/wifiscan", (t) => {
-              let d = null;
-              try { d = JSON.parse(t); } catch (e) { }
-              if (d && d.state === "done") {
-                sel.value = String(d.best);
-                msg.textContent = "Channel " + d.best + " looks quietest (" + d.networks + " networks seen). Press Save to use it.";
-                btn.disabled = false;
-              } else {
-                setTimeout(poll, 1500);
-              }
-            }, () => setTimeout(poll, 1500));
-          };
-          setTimeout(poll, 3000);
-        };
-      })();
-    </script>
     <script>
       (() => {
         const sm = new XMLHttpRequest();
