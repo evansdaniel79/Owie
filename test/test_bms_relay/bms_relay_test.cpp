@@ -248,7 +248,8 @@ void testLowCellVoltageAlwaysForwardsStatus() {
   relay->loop();
   mockDataOut.clear();
   TEST_ASSERT_TRUE(relay->isCellVoltageLow());
-  addMockData(kStatusPacket);
+  // The cell packet's trailing preamble already started this status packet.
+  addMockData({0x0, 0x0, 0x1, 0xfe});
   relay->loop();
   expectDataOut(kStatusPacket);
 }
