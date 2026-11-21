@@ -231,6 +231,33 @@ void testDefaultsOverrideSocAndBlockCurrentAndStatus() {
   expectDataOut({});
 }
 
+// Every cell at 3100 mV: the weakest cell is nearly empty.
+const std::vector<uint8_t> kLowCellsPacket = {
+    0xff, 0x55, 0xaa, 0x2, 0xc, 0x1c, 0xc, 0x1c, 0xc, 0x1c, 0xc, 0x1c,
+    0xc,  0x1c, 0xc,  0x1c, 0xc, 0x1c, 0xc, 0x1c, 0xc, 0x1c, 0xc, 0x1c,
+    0xc,  0x1c, 0xc,  0x1c, 0xc, 0x1c, 0xc, 0x1c, 0x0, 0x2a, 0x4, 0x82};
+
+void testLowCellVoltageAlwaysForwardsStatus() {
+  timeMillis = 0;
+  // Default switches (all off): status is normally swallowed...
+  addMockData(kStatusPacket);
+  relay->loop();
+  expectDataOut({});
+  // ...but never while a cell is nearly empty.
+  addMockData(kLowCellsPacket);
+  relay->loop();
+  mockDataOut.clear();
+  TEST_ASSERT_TRUE(relay->isCellVoltageLow());
+  addMockData(kStatusPacket);
+  relay->loop();
+  expectDataOut(kStatusPacket);
+}
+
+void testHealthyCellVoltageIsNotLow() {
+  timeMillis = 0;
+  TEST_ASSERT_FALSE(relay->isCellVoltageLow());
+}
+
 void testPassThroughSocForwardsBmsValueUntouched() {
   timeMillis = 0;
   relay->setPassThroughSoc(true);
@@ -435,6 +462,8 @@ int main(int argc, char** argv) {
   RUN_TEST(testPassThroughCurrentForwardsCurrentPacket);
   RUN_TEST(testPassThroughStatusForwardsStatusPacket);
   RUN_TEST(testPassThroughFlagsAreIndependent);
+  RUN_TEST(testLowCellVoltageAlwaysForwardsStatus);
+  RUN_TEST(testHealthyCellVoltageIsNotLow);
   RUN_TEST(testPacketReplay);
   RUN_TEST(testBmsInfoParsing);
   RUN_TEST(testShutdownWarningParsedAndNeverReplayed);

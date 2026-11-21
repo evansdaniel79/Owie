@@ -175,6 +175,20 @@ class BmsRelay {
   }
   bool isBatteryOvercharged() { return last_status_byte_ & 8; }
 
+  // Safety net, active in every switch combination: when the weakest cell is
+  // this low the board must hear the BMS's own low-battery signals (SOC byte
+  // and status packet) no matter what the gauge or the stock switches say.
+  static constexpr uint16_t LOW_CELL_MV = 3250;
+  bool isCellVoltageLow() {
+    uint16_t lowest = 0;
+    for (int i = 0; i < 15; i++) {
+      if (cell_millivolts_[i] > 0 && (lowest == 0 || cell_millivolts_[i] < lowest)) {
+        lowest = cell_millivolts_[i];
+      }
+    }
+    return lowest != 0 && lowest < LOW_CELL_MV;
+  }
+
   // ---- BMS identity and health, from messages 0x07/0x08/0x09/0x0B/0x0C/0x0D ----
 
   /**

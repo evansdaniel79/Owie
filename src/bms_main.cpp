@@ -66,15 +66,12 @@ void bms_setup() {
     streamBMSPacket(&unknownData[0], unknownData.size());
   });
 
+  // Never restore a saved gauge state: older fork builds stored one that can be
+  // badly stale and made the percentage jump. Drop it; the gauge starts fresh
+  // exactly like stock Owie.
   if (Settings->has_battery_state) {
-    FuelGaugeState gaugeState;
-    gaugeState.bottomMilliampSeconds =
-        Settings->battery_state.bottom_milliamp_seconds;
-    gaugeState.currentMilliampSeconds =
-        Settings->battery_state.current_milliamp_seconds;
-    gaugeState.bottomSoc = Settings->battery_state.bottom_soc;
-    gaugeState.topSoc = Settings->battery_state.top_soc;
-    relay->getBatteryFuelGauge().restoreState(gaugeState);
+    Settings->has_battery_state = false;
+    saveSettings();
   }
 
   // The BMS sends a header-less fault code ("BU" for the power button, ...)

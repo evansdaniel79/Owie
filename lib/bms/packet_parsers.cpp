@@ -25,6 +25,14 @@ void BmsRelay::batteryPercentageParser(Packet& p) {
     // Stock battery percentage switch: forward the BMS value untouched.
     return;
   }
+  if (isCellVoltageLow()) {
+    // Low-battery safety: never report more than the BMS itself does while a
+    // cell is nearly empty, so the board always gets its low-battery warning.
+    if (bms_soc_percent_ >= 0 &&
+        (overridden_soc_percent_ < 0 || bms_soc_percent_ < overridden_soc_percent_)) {
+      return;  // forward the BMS value untouched
+    }
+  }
   if (overridden_soc_percent_ < 0) {
     p.setShouldForward(false);
     return;
@@ -208,6 +216,6 @@ void BmsRelay::bmsStatusParser(Packet& p) {
   // The stock regen / range estimator switch (pass_through_status_) forwards it
   // regardless.
   p.setShouldForward(pass_through_status_ || isCharging() || isBatteryEmpty() ||
-                     isBatteryTempOutOfRange() || isBatteryOvercharged());
+                     isCellVoltageLow() || isBatteryTempOutOfRange() || isBatteryOvercharged());
   battery_fuel_gauge_.updateChargingStatus(isCharging());
 }
