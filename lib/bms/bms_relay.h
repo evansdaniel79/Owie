@@ -65,6 +65,9 @@ class BmsRelay {
    */
   uint32_t getCapturedBMSSerial() { return captured_serial_; }
 
+  /** @brief The BMS serial override value, or 0 if not set. */
+  uint32_t getBMSSerialOverride() { return serial_override_; }
+
   /**
    * @brief Battery percentage as reported by the BMS.
    */
