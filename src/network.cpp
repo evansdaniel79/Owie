@@ -79,19 +79,13 @@ String uptimeString() {
 
 
 String getTempString() {
-  const uint8_t *thermTemps = relay->getTemperaturesCelsius();
+  const int8_t *thermTemps = relay->getTemperaturesCelsius();
   String temps;
   temps.reserve(256);
   temps.concat("<tr>");
   for (int i = 0; i < 5; i++) {
-    // The last column is the thermistor on the BMS board, not a pack sensor.
-    temps.concat(i == BmsRelay::BOARD_TEMPERATURE_INDEX ? "<td title='BMS board'>"
-                                                        : "<td>");
-    if (thermTemps[i] == BmsRelay::TEMPERATURE_INVALID) {
-      temps.concat("n/a");
-    } else {
-      temps.concat(thermTemps[i]);
-    }
+    temps.concat("<td>");
+    temps.concat(thermTemps[i]);
     temps.concat("</td>");
   }
   temps.concat("<tr>");
