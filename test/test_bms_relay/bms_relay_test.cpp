@@ -173,9 +173,22 @@ void testDefaultsOverrideSocAndBlockCurrentAndStatus() {
   // packets are swallowed while not charging.
   addMockData(kSocPacket);
   relay->loop();
-  // Fuel gauge has no data yet, so the SOC gets rewritten to 0 (+ new CRC).
-  expectDataOut({0xff, 0x55, 0xaa, 0x3, 0x0, 0x2, 0x1});
+  // No cell voltages seen yet: like lolwheel v1.4.3 the SOC packet is swallowed.
+  expectDataOut({});
   TEST_ASSERT_EQUAL(43, relay->getBmsReportedSOC());
+
+  // Every cell at 3860 mV -> lookup table gives 61% (0x3d).
+  addMockData({0xff, 0x55, 0xaa, 0x02, 0x0f, 0x14, 0x0f, 0x14, 0x0f, 0x14, 0x0f,
+               0x14, 0x0f, 0x14, 0x0f, 0x14, 0x0f, 0x14, 0x0f, 0x14, 0x0f, 0x14,
+               0x0f, 0x14, 0x0f, 0x14, 0x0f, 0x14, 0x0f, 0x14, 0x0f, 0x14, 0x00,
+               0x2a, 0x04, 0x37, 0xFF, 0x55, 0xAA});
+  relay->loop();
+  mockDataOut.clear();
+  // The trailing preamble above already started this SOC packet.
+  addMockData({0x3, 0x2b, 0x2, 0x2c});
+  relay->loop();
+  expectDataOut({0xff, 0x55, 0xaa, 0x3, 0x3d, 0x2, 0x3e});
+  TEST_ASSERT_EQUAL(61, relay->getOverriddenSOC());
 
   addMockData(kCurrentPacket);
   relay->loop();

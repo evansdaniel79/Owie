@@ -20,7 +20,11 @@ void BmsRelay::batteryPercentageParser(Packet& p) {
   }
   // 0x3 message is just one byte containing battery percentage.
   bms_soc_percent_ = *(int8_t*)p.data();
-  overridden_soc_percent_ = battery_fuel_gauge_.getSoc();
+  // Same rule as the released lolwheel v1.4.3: percentage comes from the
+  // smoothed lowest cell voltage through the lookup table. (The coulomb
+  // counting gauge on lolwheel's main branch is unfinished and not used here;
+  // it only feeds the used/regen statistics.)
+  overridden_soc_percent_ = battery_fuel_gauge_.getVoltageBasedSoc();
   if (pass_through_soc_) {
     return;  // stock battery % switch: BMS value forwarded untouched
   }
