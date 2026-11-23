@@ -65,9 +65,10 @@ jobs:
       - name: Upload artifacts
         id: artifact
         if: always() && steps.build.outcome == 'success'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
-          name: Owie_${{ steps.version.outputs.ver }}
+          # Not zipped: the Actions page offers Owie_<version>.bin directly.
+          archive: false
           path: Owie_${{ steps.version.outputs.ver }}.bin
       - name: Upload test and build logs for the PR report
         if: always() && github.event_name == 'pull_request'
@@ -99,7 +100,7 @@ jobs:
         continue-on-error: true
       - name: Download firmware
         if: needs.build_and_test.outputs.build == 'success'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: Owie_*
           merge-multiple: true
