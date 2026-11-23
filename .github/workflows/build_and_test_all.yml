@@ -55,13 +55,20 @@ jobs:
         run: |
           set -o pipefail
           pio --no-ansi run -e d1_mini_lite_clone 2>&1 | tee build-output.txt
+      - name: Name the firmware after its version
+        id: version
+        if: always() && steps.build.outcome == 'success'
+        run: |
+          VER=$(sed -n 's/.*owie_version = "\(.*\)";/\1/p' src/network.cpp | head -1)
+          echo "ver=${VER}" >> "$GITHUB_OUTPUT"
+          cp .pio/build/d1_mini_lite_clone/firmware.bin "Owie_${VER}.bin"
       - name: Upload artifacts
         id: artifact
         if: always() && steps.build.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
-          name: firmware
-          path: .pio/build/d1_mini_lite_clone/firmware.bin
+          name: Owie_${{ steps.version.outputs.ver }}
+          path: Owie_${{ steps.version.outputs.ver }}.bin
       - name: Upload test and build logs for the PR report
         if: always() && github.event_name == 'pull_request'
         uses: actions/upload-artifact@v4
@@ -94,7 +101,8 @@ jobs:
         if: needs.build_and_test.outputs.build == 'success'
         uses: actions/download-artifact@v4
         with:
-          name: firmware
+          pattern: Owie_*
+          merge-multiple: true
           path: fw
       - name: Publish firmware.bin as a direct download (per-PR pre-release)
         # Artifacts are only served as zip files, so the .bin is published as
@@ -113,8 +121,7 @@ jobs:
         run: |
           set -euo pipefail
           TAG="ci-pr-${PR_NUMBER}"
-          ASSET="firmware_${HEAD_SHA:0:7}.bin"
-          cp fw/firmware.bin "fw/${ASSET}"
+          ASSET="$(basename fw/Owie_*.bin)"
           NOTES="Automated build of PR #${PR_NUMBER} at ${HEAD_SHA} by the \"Build and test everything\" workflow. Pre-release only: replaced on every push to the PR and deleted when the PR closes. This is not a release of Owie; see Releases for those."
           gh release delete "$TAG" --cleanup-tag -y 2>/dev/null || true
           gh release create "$TAG" "fw/${ASSET}" \

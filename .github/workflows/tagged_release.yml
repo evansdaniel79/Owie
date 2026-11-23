@@ -22,7 +22,8 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: firmware
+          pattern: Owie_*
+          merge-multiple: true
           path: ./fw
       - name: Name the firmware after the release tag
         # The build artifact is always firmware.bin; the release asset carries
@@ -31,7 +32,7 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          mv ./fw/firmware.bin "./fw/firmware_${TAG}.bin"
+          mv ./fw/Owie_*.bin "./fw/firmware_${TAG}.bin"
           ls -l ./fw
       - uses: "marvinpinto/action-automatic-releases@latest"
         with:
