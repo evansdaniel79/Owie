@@ -1,0 +1,32 @@
+name: core-probe
+# Diagnostic: build the same source against several ESP8266 platform versions
+# and report which one matches the official v1.4.3 binary (371040 bytes,
+# contains the string "MD5 Failed: expected").
+on:
+  push:
+    paths: ['.github/workflows/core_probe.yml']
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: ['espressif8266@2.6.3', 'espressif8266@3.2.0', 'espressif8266@4.0.1', 'espressif8266@4.1.0', 'espressif8266@4.2.1']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: |
+          pip install platformio
+          npm install html-minifier-terser -g
+          sed -i "s|^platform = .*|platform = ${{ matrix.platform }}|" platformio.ini
+          pio run -e d1_mini_lite_clone 2>&1 | tail -5
+          F=.pio/build/d1_mini_lite_clone/firmware.bin
+          echo "PROBE ${{ matrix.platform }} size=$(stat -c %s $F)"
+          echo "PROBE md5failed=$(strings $F | grep -c 'MD5 Failed: expected') flashreal=$(strings $F | grep -c 'Flash config wrong real')"
+          pio pkg list -e d1_mini_lite_clone 2>/dev/null | grep -i "framework-arduino\|toolchain" | sed 's/^/PROBE /'
