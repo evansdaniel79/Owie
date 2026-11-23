@@ -6,7 +6,7 @@
 #include <limits>
 #include <vector>
 
-#include "battery_fuel_gauge.h"
+#include "filter.h"
 #include "packet_tracker.h"
 
 class Packet;
@@ -28,14 +28,12 @@ class BmsRelay {
    */
   typedef std::function<void(BmsRelay*, Packet*)> PacketCallback;
 
-  typedef std::function<unsigned long()> MillisProvider;
+  typedef std::function<unsigned long()> Millis;
 
-  BmsRelay(const Source& source, const Sink& sink,
-           const MillisProvider& millisProvider);
+  BmsRelay(const Source& source, const Sink& sink, const Millis& millis);
 
   /**
-   * @brief All of the data ingestion, processing and forwarding is done here.
-   * Must be called continuously from arduino loop.
+   * @brief Call from arduino loop.
    */
   void loop();
 
@@ -45,6 +43,14 @@ class BmsRelay {
 
   void addForwardedPacketCallback(const PacketCallback& callback) {
     forwardedPacketCallbacks_.push_back(callback);
+  }
+
+  void setPowerOffCallback(const std::function<void(void)>& c) {
+    powerOffCallback_ = c;
+  }
+
+  void setSocRewriterCallback(const std::function<int8_t(int8_t, bool*)>& c) {
+    socRewriterCallback_ = c;
   }
 
   void setUnknownDataCallback(const Sink& c) { unknownDataCallback_ = c; }
@@ -64,9 +70,6 @@ class BmsRelay {
    * @return non-zero serial, if it's already been captured.
    */
   uint32_t getCapturedBMSSerial() { return captured_serial_; }
-
-  /** @brief The BMS serial override value, or 0 if not set. */
-  uint32_t getBMSSerialOverride() { return serial_override_; }
 
   /**
    * @brief Battery percentage as reported by the BMS.
@@ -96,13 +99,13 @@ class BmsRelay {
   /**
    * @brief Current In Amps.
    */
-  int32_t getCurrentMilliamps() { return current_milliamps_; }
+  float getCurrentInAmps() { return current_ * CURRENT_SCALER; }
 
   int32_t getUsedChargeMah() {
-    return battery_fuel_gauge_.getMilliampSecondsDischarged() / 3600;
+    return current_times_milliseconds_used_ * CURRENT_SCALER / 3600;
   }
   int32_t getRegeneratedChargeMah() {
-    return battery_fuel_gauge_.getMilliampSecondsRecharged() / 3600;
+    return current_times_milliseconds_regenerated_ * CURRENT_SCALER / 3600;
   }
 
   bool isCharging() { return last_status_byte_ & 0x20; }
@@ -114,71 +117,10 @@ class BmsRelay {
   }
   bool isBatteryOvercharged() { return last_status_byte_ & 8; }
 
-  // ---- BMS identity and health, from messages 0x07/0x08/0x09/0x0B/0x0C/0x0D ----
-
-  /**
-   * @brief Firmware version from the boot message 0x0B: 2006 = XR hardware
-   * 4206-4209, 2007 = XR 4210, 3004/3005/3008 = Pint. 0 until seen (the
-   * message is only sent once at power up).
-   */
-  uint16_t getBmsFirmwareVersion() { return bms_firmware_version_; }
-
-  /**
-   * @brief Hardware/variant byte from message 0x08: 0x02 = XR 4208-4210,
-   * 0x04 = XR 4206, 0x06 = Pint. 0 until seen.
-   */
-  uint8_t getBmsVariant() { return bms_variant_; }
-
-  /**
-   * @brief Reason for the last BMS power-off, from message 0x09 (the code the
-   * BMS stored in its EEPROM when it shut down): 1 DC done charging, 2 CD
-   * charger disconnected, 3 BU power button, 4 QC hardware fault input,
-   * 5 OC over-current, 6 UV under-voltage, 7 CUV critical under-voltage,
-   * 8 OT over-temperature, 9 OV over-voltage, 10 PR pre-charge failed,
-   * 11 ZC idle timeout, 12 CS current sensor fault, 13 CC charge over-current
-   * (Pint). 0 = none / not seen.
-   */
-  uint8_t getLastShutdownReasonCode() { return last_shutdown_reason_code_; }
-  static const char* shutdownReasonName(uint8_t code);
-
-  // Protection thresholds the BMS reports in message 0x07, 0 until seen.
-  uint16_t getOverVoltageThresholdMillivolts() { return ov_threshold_mv_; }
-  uint16_t getChargeCompleteThresholdMillivolts() { return full_threshold_mv_; }
-  uint16_t getUnderVoltageThresholdMillivolts() { return uv_threshold_mv_; }
-  uint8_t getOverTemperatureThresholdCelsius() { return ot_threshold_c_; }
-
-  /** @brief Cell balancing mask from message 0x0C, one bit per cell. */
-  uint16_t getBalancingMask() { return balancing_mask_; }
-
-  /**
-   * @brief Cycle counter and state of health from message 0x0D. Only XR 4210
-   * and Pint BMSes send it; hasCycleInfo() tells whether it was seen.
-   */
-  bool hasCycleInfo() { return has_cycle_info_; }
-  uint16_t getCycleCount() { return cycle_count_; }
-  uint8_t getStateOfHealthPercent() { return state_of_health_percent_; }
-
-  const PacketTracker& getPacketTracker() const { return packet_tracker_; }
-
-  BatteryFuelGauge& getBatteryFuelGauge() { return battery_fuel_gauge_; }
-
-  /**
-   * @brief "Stock battery mode" switches. All default to false (original Owie
-   * behavior). Only enable these on a board with a non-upgraded stock battery.
-   *
-   * Owie still parses every packet and keeps its own stats either way; these
-   * only control what is sent on to the board.
-   */
-  /** Forward the BMS battery percentage untouched instead of Owie's estimate. */
-  void setPassThroughSoc(bool enabled) { pass_through_soc_ = enabled; }
-  /** Always forward the current packet (restores regen percent and range). */
-  void setPassThroughCurrent(bool enabled) { pass_through_current_ = enabled; }
-  /** Always forward the status packet, not only on warnings or charging. */
-  void setPassThroughStatus(bool enabled) { pass_through_status_ = enabled; }
+  const PacketTracker& getPacketTracker() const { return packet_tracker_;}
 
  private:
-  // BMS current units to milliamps.
-  static constexpr int CURRENT_SCALER = 55;
+  static constexpr float CURRENT_SCALER = 0.055;
   void processNextByte();
   void purgeUnknownData();
   void maybeReplayPackets();
@@ -187,40 +129,32 @@ class BmsRelay {
   std::vector<PacketCallback> receivedPacketCallbacks_;
   std::vector<PacketCallback> forwardedPacketCallbacks_;
   Sink unknownDataCallback_;
+  std::function<int8_t(int8_t, bool*)> socRewriterCallback_;
+  std::function<void(void)> powerOffCallback_;
 
   std::vector<uint8_t> sourceBuffer_;
   uint32_t serial_override_ = 0;
   uint32_t captured_serial_ = 0;
-  int16_t current_milliamps_ = 0;
+  int16_t current_ = 0;
 
   int8_t bms_soc_percent_ = -1;
   int8_t overridden_soc_percent_ = -1;
   uint16_t cell_millivolts_[15] = {0};
   uint16_t total_voltage_millivolts_ = 0;
+  LowPassFilter lowest_cell_voltage_filter_;
+  uint16_t filtered_lowest_cell_voltage_millivolts_ = 0;
 
   int8_t temperatures_celsius_[5] = {0};
   int8_t avg_temperature_celsius_ = 0;
+  unsigned long last_current_message_millis_ = 0;
+  int16_t last_current_ = 0;
+  int32_t current_times_milliseconds_used_ = 0;
+  int32_t current_times_milliseconds_regenerated_ = 0;
   uint8_t last_status_byte_ = 0;
-  bool pass_through_soc_ = false;
-  bool pass_through_current_ = false;
-  bool pass_through_status_ = false;
-  uint16_t bms_firmware_version_ = 0;
-  uint8_t bms_variant_ = 0;
-  uint8_t last_shutdown_reason_code_ = 0;
-  uint16_t ov_threshold_mv_ = 0;
-  uint16_t full_threshold_mv_ = 0;
-  uint16_t uv_threshold_mv_ = 0;
-  uint8_t ot_threshold_c_ = 0;
-  uint16_t balancing_mask_ = 0;
-  bool has_cycle_info_ = false;
-  uint16_t cycle_count_ = 0;
-  uint8_t state_of_health_percent_ = 0;
   const Source source_;
   const Sink sink_;
-  const MillisProvider millis_provider_;
-  int32_t now_millis_;
+  const Millis millis_;
   PacketTracker packet_tracker_;
-  BatteryFuelGauge battery_fuel_gauge_;
 
   void bmsStatusParser(Packet& p);
   void bmsSerialParser(Packet& p);
@@ -228,7 +162,7 @@ class BmsRelay {
   void batteryPercentageParser(Packet& p);
   void cellVoltageParser(Packet& p);
   void temperatureParser(Packet& p);
-  void bmsInfoParser(Packet& p);
+  void powerOffParser(Packet& p);
 };
 
 #endif  // BMS_RELAY_H

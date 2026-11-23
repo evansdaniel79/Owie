@@ -5,7 +5,6 @@
 #include <cstdio>
 #include <deque>
 #include <memory>
-#include <string>
 
 #include "packet.h"
 
@@ -135,7 +134,7 @@ void testBatterySocParsing() {
 void testCurrentParsing() {
   addMockData({0xff, 0x55, 0xaa, 0x5, 0xff, 0xe8, 0x3, 0xea, 0xFF, 0x55, 0xAA});
   relay->loop();
-  TEST_ASSERT_EQUAL(-1320, relay->getCurrentMilliamps());
+  TEST_ASSERT_FLOAT_WITHIN(0.01, -1.32, relay->getCurrentInAmps());
 }
 
 void testCellVoltageParsing() {
@@ -150,6 +149,15 @@ void testCellVoltageParsing() {
   TEST_ASSERT_EQUAL(57894, relay->getTotalVoltageMillivolts());
 }
 
+void testTemperatureParsing() {
+  addMockData({0xff, 0x55, 0xaa, 0x04, 0x13, 0x14, 0x14, 0x14, 0x16, 0x02, 0xFF,
+               0x55, 0xAA});
+  relay->loop();
+  int8_t expected[5] = {19, 20, 20, 20, 22};
+  TEST_ASSERT_EQUAL_INT8_ARRAY(expected, relay->getTemperaturesCelsius(), 5);
+  TEST_ASSERT_EQUAL(20, relay->getAverageTemperatureCelsius());
+}
+
 void testBlocksStatusPacketsUnlessWarning() {
   addMockData({0xff, 0x55, 0xaa, 0x0, 0x0, 0x1, 0xFE, 0x1});
   relay->loop();
@@ -158,103 +166,6 @@ void testBlocksStatusPacketsUnlessWarning() {
   addMockData({0xff, 0x55, 0xaa, 0x0, 0x21, 0x2, 0x1F, 0x1});
   relay->loop();
   expectDataOut({0xff, 0x55, 0xaa, 0x0, 0x21, 0x2, 0x1F, 0x1});
-}
-
-// Packets used by the "stock battery mode" pass-through tests.
-const std::vector<uint8_t> kSocPacket = {0xff, 0x55, 0xaa, 0x3, 0x2b, 0x2, 0x2c};
-const std::vector<uint8_t> kCurrentPacket = {0xff, 0x55, 0xaa, 0x5,
-                                             0xff, 0xe8, 0x3,  0xea};
-const std::vector<uint8_t> kStatusPacket = {0xff, 0x55, 0xaa, 0x0,
-                                            0x0,  0x1,  0xfe};
-
-void testDefaultsOverrideSocAndBlockCurrentAndStatus() {
-  timeMillis = 0;
-  // Default (original Owie) behavior: SOC is rewritten, current and status
-  // packets are swallowed while not charging.
-  addMockData(kSocPacket);
-  relay->loop();
-  // No cell voltages seen yet: like lolwheel v1.4.3 the SOC packet is swallowed.
-  expectDataOut({});
-  TEST_ASSERT_EQUAL(43, relay->getBmsReportedSOC());
-
-  // Every cell at 3860 mV -> lookup table gives 61% (0x3d).
-  {
-    // 15 cells at 3860 mV (0x0f14), the extra word, checksum, next preamble.
-    std::vector<uint8_t> cells = {0xff, 0x55, 0xaa, 0x02};
-    for (int c = 0; c < 15; c++) {
-      cells.push_back(0x0f);
-      cells.push_back(0x14);
-    }
-    cells.push_back(0x00);
-    cells.push_back(0x2a);
-    uint16_t sum = 0;
-    for (uint8_t b : cells) sum += b;
-    cells.push_back(sum >> 8);
-    cells.push_back(sum & 0xff);
-    cells.insert(cells.end(), {0xff, 0x55, 0xaa});
-    addMockData(cells);
-  }
-  relay->loop();
-  mockDataOut.clear();
-  // The trailing preamble above already started this SOC packet.
-  addMockData({0x3, 0x2b, 0x2, 0x2c});
-  relay->loop();
-  expectDataOut({0xff, 0x55, 0xaa, 0x3, 0x3d, 0x2, 0x3e});
-  TEST_ASSERT_EQUAL(61, relay->getOverriddenSOC());
-
-  addMockData(kCurrentPacket);
-  relay->loop();
-  expectDataOut({});
-
-  addMockData(kStatusPacket);
-  relay->loop();
-  expectDataOut({});
-}
-
-void testPassThroughSocForwardsBmsValueUntouched() {
-  timeMillis = 0;
-  relay->setPassThroughSoc(true);
-  addMockData(kSocPacket);
-  relay->loop();
-  expectDataOut(kSocPacket);
-  TEST_ASSERT_EQUAL(43, relay->getBmsReportedSOC());
-}
-
-void testPassThroughCurrentForwardsCurrentPacket() {
-  timeMillis = 0;
-  relay->setPassThroughCurrent(true);
-  addMockData(kCurrentPacket);
-  relay->loop();
-  expectDataOut(kCurrentPacket);
-  // Owie's own stats keep working.
-  TEST_ASSERT_EQUAL(-1320, relay->getCurrentMilliamps());
-}
-
-void testPassThroughStatusForwardsStatusPacket() {
-  timeMillis = 0;
-  relay->setPassThroughStatus(true);
-  addMockData(kStatusPacket);
-  relay->loop();
-  expectDataOut(kStatusPacket);
-}
-
-void testPassThroughFlagsAreIndependent() {
-  timeMillis = 0;
-  // Only SOC pass-through on: current and status must still be blocked.
-  relay->setPassThroughSoc(true);
-  addMockData(kCurrentPacket);
-  relay->loop();
-  expectDataOut({});
-  addMockData(kStatusPacket);
-  relay->loop();
-  expectDataOut({});
-
-  // Only current pass-through on: SOC must still be rewritten.
-  setUp();
-  relay->setPassThroughCurrent(true);
-  addMockData(kSocPacket);
-  relay->loop();
-  expectDataOut({});  // not forwarded untouched (swallowed: no voltage yet)
 }
 
 void testPacketReplay() {
@@ -287,38 +198,6 @@ void testPacketReplay() {
                  0x06, 0x02, 0x0c});
 }
 
-void testBmsInfoParsing() {
-  TEST_ASSERT_FALSE(relay->hasCycleInfo());
-  TEST_ASSERT_EQUAL(0, relay->getBmsFirmwareVersion());
-  // Frames captured from a Pint: thresholds, variant, last fault, version,
-  // balancing mask, cycles + health.
-  addMockData({0xff, 0x55, 0xaa, 0x07, 0x10, 0xcc, 0x10, 0x57, 0x09, 0xc4, 0x50,
-               0x04, 0x65});
-  addMockData({0xff, 0x55, 0xaa, 0x08, 0x06, 0x02, 0x0c});
-  addMockData({0xff, 0x55, 0xaa, 0x09, 0x03, 0x02, 0x0a});
-  addMockData({0xff, 0x55, 0xaa, 0x0b, 0x0b, 0xc0, 0x02, 0xd4});
-  addMockData({0xff, 0x55, 0xaa, 0x0c, 0x00, 0x00, 0x02, 0x0a});
-  addMockData({0xff, 0x55, 0xaa, 0x0d, 0x02, 0xda, 0x47, 0x03, 0x2e});
-  relay->loop();
-  TEST_ASSERT_EQUAL(4300, relay->getOverVoltageThresholdMillivolts());
-  TEST_ASSERT_EQUAL(4183, relay->getChargeCompleteThresholdMillivolts());
-  TEST_ASSERT_EQUAL(2500, relay->getUnderVoltageThresholdMillivolts());
-  TEST_ASSERT_EQUAL(80, relay->getOverTemperatureThresholdCelsius());
-  TEST_ASSERT_EQUAL(0x06, relay->getBmsVariant());
-  TEST_ASSERT_EQUAL(3, relay->getLastShutdownReasonCode());
-  TEST_ASSERT_EQUAL_STRING("BU - power button",
-                           BmsRelay::shutdownReasonName(3));
-  TEST_ASSERT_EQUAL_STRING("none", BmsRelay::shutdownReasonName(0));
-  TEST_ASSERT_EQUAL_STRING("CC - charge over-current",
-                           BmsRelay::shutdownReasonName(13));
-  TEST_ASSERT_EQUAL_STRING("unknown", BmsRelay::shutdownReasonName(14));
-  TEST_ASSERT_EQUAL(3008, relay->getBmsFirmwareVersion());
-  TEST_ASSERT_EQUAL(0, relay->getBalancingMask());
-  TEST_ASSERT_TRUE(relay->hasCycleInfo());
-  TEST_ASSERT_EQUAL(730, relay->getCycleCount());
-  TEST_ASSERT_EQUAL(71, relay->getStateOfHealthPercent());
-}
-
 int main(int argc, char** argv) {
   UNITY_BEGIN();
   RUN_TEST(testUnknownDataAfterKnownPacketGetsFlushedImmediately);
@@ -330,13 +209,7 @@ int main(int argc, char** argv) {
   RUN_TEST(testCurrentParsing);
   RUN_TEST(testCellVoltageParsing);
   RUN_TEST(testBlocksStatusPacketsUnlessWarning);
-  RUN_TEST(testDefaultsOverrideSocAndBlockCurrentAndStatus);
-  RUN_TEST(testPassThroughSocForwardsBmsValueUntouched);
-  RUN_TEST(testPassThroughCurrentForwardsCurrentPacket);
-  RUN_TEST(testPassThroughStatusForwardsStatusPacket);
-  RUN_TEST(testPassThroughFlagsAreIndependent);
   RUN_TEST(testPacketReplay);
-  RUN_TEST(testBmsInfoParsing);
   UNITY_END();
 
   return 0;

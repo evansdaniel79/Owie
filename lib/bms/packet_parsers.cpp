@@ -7,9 +7,31 @@
 
 namespace {
 
+template <class T>
+inline T clamp(T x, T lower, T upper) {
+  return std::min(upper, std::max(x, lower));
+}
+
 inline int16_t int16FromNetworkOrder(const void* const p) {
   uint8_t* const charPointer = (uint8_t* const)p;
   return ((uint16_t)(*charPointer)) << 8 | *(charPointer + 1);
+}
+
+int openCircuitSocFromCellVoltage(int cellVoltageMillivolts) {
+  static constexpr int LOOKUP_TABLE_RANGE_MIN_MV = 2700;
+  static constexpr int LOOKUP_TABLE_RANGE_MAX_MV = 4200;
+  static uint8_t LOOKUP_TABLE[31] = {0, 0, 0, 0, 1, 2, 3, 4, 5, 7, 8, 11, 14, 16, 18, 19, 25, 30, 33, 37, 43, 48, 53, 60, 67, 71, 76, 82, 92, 97, 100};
+  static constexpr int LOOKUP_TABLE_SIZE = (sizeof(LOOKUP_TABLE)/sizeof(*LOOKUP_TABLE));
+  static constexpr int RANGE = LOOKUP_TABLE_RANGE_MAX_MV - LOOKUP_TABLE_RANGE_MIN_MV;
+  // (RANGE - 1) upper limit effectively clamps the leftIndex below to (LOOKUP_TABLE_SIZE - 2)
+  cellVoltageMillivolts = clamp(cellVoltageMillivolts - LOOKUP_TABLE_RANGE_MIN_MV, 0, RANGE - 1);
+  float floatIndex = float(cellVoltageMillivolts) * (LOOKUP_TABLE_SIZE - 1) / RANGE;
+  const int leftIndex = int(floatIndex);
+  const float fractional = floatIndex - leftIndex;
+  const int rightIndex = leftIndex + 1;
+  const int leftValue = LOOKUP_TABLE[leftIndex];
+  const int rightValue = LOOKUP_TABLE[rightIndex];
+  return leftValue + round((rightValue - leftValue) * fractional);
 }
 
 }  // namespace
@@ -20,18 +42,13 @@ void BmsRelay::batteryPercentageParser(Packet& p) {
   }
   // 0x3 message is just one byte containing battery percentage.
   bms_soc_percent_ = *(int8_t*)p.data();
-  // Same rule as the released lolwheel v1.4.3: percentage comes from the
-  // smoothed lowest cell voltage through the lookup table. (The coulomb
-  // counting gauge on lolwheel's main branch is unfinished and not used here;
-  // it only feeds the used/regen statistics.)
-  overridden_soc_percent_ = battery_fuel_gauge_.getVoltageBasedSoc();
-  if (pass_through_soc_) {
-    return;  // stock battery % switch: BMS value forwarded untouched
-  }
-  if (overridden_soc_percent_ < 0) {
+  if (filtered_lowest_cell_voltage_millivolts_ == 0) {
+    // If we don't have voltage, swallow the packet
     p.setShouldForward(false);
     return;
   }
+  overridden_soc_percent_ =
+      openCircuitSocFromCellVoltage(filtered_lowest_cell_voltage_millivolts_);
   p.data()[0] = overridden_soc_percent_;
 }
 
@@ -39,13 +56,29 @@ void BmsRelay::currentParser(Packet& p) {
   if (p.getType() != 5) {
     return;
   }
-  p.setShouldForward(pass_through_current_ || isCharging());
+  p.setShouldForward(isCharging());
 
   // 0x5 message encodes current as signed int16.
   // The scaling factor (tested on a Pint) seems to be 0.055
-  // i.e. 1 in the data message below corresponds to 55 milliamps.
-  current_milliamps_ = int16FromNetworkOrder(p.data()) * CURRENT_SCALER;
-  battery_fuel_gauge_.updateCurrent(current_milliamps_, now_millis_);
+  // i.e. 1 in the data message below corresponds to 0.055 Amps.
+  current_ = int16FromNetworkOrder(p.data());
+
+  const unsigned long now = millis_();
+  if (last_current_message_millis_ == 0) {
+    last_current_ = current_;
+    last_current_message_millis_ = now;
+    return;
+  }
+  const int32_t millisElapsed = (int32_t)(now - last_current_message_millis_);
+  last_current_message_millis_ = now;
+  const int32_t current_times_milliseconds =
+      (last_current_ + current_) * millisElapsed / 2;
+  last_current_ = current_;
+  if (current_times_milliseconds > 0) {
+    current_times_milliseconds_used_ += current_times_milliseconds;
+  } else {
+    current_times_milliseconds_regenerated_ -= current_times_milliseconds;
+  }
 }
 
 void BmsRelay::bmsSerialParser(Packet& p) {
@@ -87,7 +120,11 @@ void BmsRelay::cellVoltageParser(Packet& p) {
     cell_millivolts_[i] = cellVoltage;
   }
   total_voltage_millivolts_ = total_voltage;
-  battery_fuel_gauge_.updateVoltage(min_voltage, now_millis_);
+  if (filtered_lowest_cell_voltage_millivolts_ == 0) {
+    lowest_cell_voltage_filter_.setTo(min_voltage);
+  }
+  filtered_lowest_cell_voltage_millivolts_ =
+      lowest_cell_voltage_filter_.step(min_voltage);
 }
 
 void BmsRelay::temperatureParser(Packet& p) {
@@ -104,6 +141,16 @@ void BmsRelay::temperatureParser(Packet& p) {
   avg_temperature_celsius_ = temperature_sum / 5;
 }
 
+void BmsRelay::powerOffParser(Packet& p) {
+  if (p.getType() != 11) {
+    return;
+  }
+  // We're about to shut down.
+  if (powerOffCallback_) {
+    powerOffCallback_();
+  }
+}
+
 void BmsRelay::bmsStatusParser(Packet& p) {
   if (p.getType() != 0) {
     return;
@@ -113,62 +160,6 @@ void BmsRelay::bmsStatusParser(Packet& p) {
   // Forwarding the status packet during normal operation seems to drive
   // an event loop in the controller that tallies used Ah and eventually
   // makes the board throw Error 23. Swallowing the packet does the trick.
-  p.setShouldForward(pass_through_status_ || isCharging() || isBatteryEmpty() ||
+  p.setShouldForward(isCharging() || isBatteryEmpty() ||
                      isBatteryTempOutOfRange() || isBatteryOvercharged());
-  battery_fuel_gauge_.updateChargingStatus(isCharging());
-}
-
-void BmsRelay::bmsInfoParser(Packet& p) {
-  const uint8_t* const data = p.data();
-  switch (p.getType()) {
-    case 0x07:
-      // Thresholds: over-voltage mV, charge-complete mV, under-voltage mV
-      // (uint16 each), over-temperature C.
-      ov_threshold_mv_ = int16FromNetworkOrder(data);
-      full_threshold_mv_ = int16FromNetworkOrder(data + 2);
-      uv_threshold_mv_ = int16FromNetworkOrder(data + 4);
-      ot_threshold_c_ = data[6];
-      break;
-    case 0x08:
-      bms_variant_ = data[0];
-      break;
-    case 0x09:
-      last_shutdown_reason_code_ = data[0];
-      break;
-    case 0x0B:
-      bms_firmware_version_ = int16FromNetworkOrder(data);
-      break;
-    case 0x0C:
-      balancing_mask_ = int16FromNetworkOrder(data);
-      break;
-    case 0x0D:
-      cycle_count_ = int16FromNetworkOrder(data);
-      state_of_health_percent_ = data[2];
-      has_cycle_info_ = true;
-      break;
-    default:
-      break;
-  }
-}
-
-const char* BmsRelay::shutdownReasonName(uint8_t code) {
-  static const char* const NAMES[] = {
-      "none",
-      "DC - done charging",
-      "CD - charger disconnected",
-      "BU - power button",
-      "QC - hardware fault input",
-      "OC - over-current",
-      "UV - under-voltage",
-      "CUV - critical under-voltage",
-      "OT - over-temperature",
-      "OV - over-voltage",
-      "PR - pre-charge failed",
-      "ZC - idle timeout",
-      "CS - current sensor fault",
-      "CC - charge over-current"};
-  if (code >= sizeof(NAMES) / sizeof(*NAMES)) {
-    return "unknown";
-  }
-  return NAMES[code];
 }

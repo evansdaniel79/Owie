@@ -3,7 +3,7 @@
 
 #include "settings.pb.h"
 
-extern SettingsMsg * const Settings;
+extern SettingsMsg *Settings;
 
 void loadSettings();
 /**
@@ -19,4 +19,4 @@ void disableFlashPageRotation();
 
 void nukeSettings();
 
-#endif  // SETTINGS_H
+#endif // SETTINGS_H
