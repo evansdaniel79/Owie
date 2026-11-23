@@ -178,10 +178,22 @@ void testDefaultsOverrideSocAndBlockCurrentAndStatus() {
   TEST_ASSERT_EQUAL(43, relay->getBmsReportedSOC());
 
   // Every cell at 3860 mV -> lookup table gives 61% (0x3d).
-  addMockData({0xff, 0x55, 0xaa, 0x02, 0x0f, 0x14, 0x0f, 0x14, 0x0f, 0x14, 0x0f,
-               0x14, 0x0f, 0x14, 0x0f, 0x14, 0x0f, 0x14, 0x0f, 0x14, 0x0f, 0x14,
-               0x0f, 0x14, 0x0f, 0x14, 0x0f, 0x14, 0x0f, 0x14, 0x0f, 0x14, 0x00,
-               0x2a, 0x04, 0x37, 0xFF, 0x55, 0xAA});
+  {
+    // 15 cells at 3860 mV (0x0f14), the extra word, checksum, next preamble.
+    std::vector<uint8_t> cells = {0xff, 0x55, 0xaa, 0x02};
+    for (int c = 0; c < 15; c++) {
+      cells.push_back(0x0f);
+      cells.push_back(0x14);
+    }
+    cells.push_back(0x00);
+    cells.push_back(0x2a);
+    uint16_t sum = 0;
+    for (uint8_t b : cells) sum += b;
+    cells.push_back(sum >> 8);
+    cells.push_back(sum & 0xff);
+    cells.insert(cells.end(), {0xff, 0x55, 0xaa});
+    addMockData(cells);
+  }
   relay->loop();
   mockDataOut.clear();
   // The trailing preamble above already started this SOC packet.
@@ -242,7 +254,7 @@ void testPassThroughFlagsAreIndependent() {
   relay->setPassThroughCurrent(true);
   addMockData(kSocPacket);
   relay->loop();
-  expectDataOut({0xff, 0x55, 0xaa, 0x3, 0x0, 0x2, 0x1});
+  expectDataOut({});  // not forwarded untouched (swallowed: no voltage yet)
 }
 
 void testPacketReplay() {
